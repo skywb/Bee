@@ -1,0 +1,6 @@
+*.vpp*
+*.doc*
+.ccls-cache
+src/Debug
+src/compile_commands.json
+src/.ccls-cache
