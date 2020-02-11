@@ -1,27 +1,29 @@
 #include "UDPSender.h"
+#include "log/mlog.hpp"
 #include <boost/asio.hpp>
+#include <iostream>
 
 using namespace Bee;
 
 UDPSender::UDPSender(boost::asio::ip::udp::socket& socket):
 	socket_(socket) {
-		heart_rate_ = 1000;
+		heart_rate_ = std::chrono::milliseconds(1000);
 }
 
 void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf) {
 	std::lock_guard<std::mutex> lock(mutex_endpoints_);
 	for (auto i : endpoints_) {
-		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->Size()), i.second.endpoint_,
+		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()), i.second.endpoint_,
 				[buf](const boost::system::error_code& error, std::size_t size) {
 					if (error) {
-						//TODO: log message
+						LOG_ERROR << "Send error : " << error.message();
 					}
 				});
 	}
 }
 
 void UDPSender::SetHeartRate(unsigned int rate) {
-	heart_rate_ = rate;
+	heart_rate_ = std::chrono::milliseconds(rate);
 }
 
 void UDPSender::AddClient(UDPEndPoint endpoint) {
@@ -29,7 +31,7 @@ void UDPSender::AddClient(UDPEndPoint endpoint) {
 	boost::system::error_code ec;
 	auto addr = boost::asio::ip::address::from_string(endpoint.IP, ec);
 	if (ec) {
-		//TODO: //log message
+		LOG_ERROR << "Add endpoint error : " << ec.message();
 		return ;
 	}
 	auto it = endpoints_.emplace(std::make_pair (endpoint, endpoint));

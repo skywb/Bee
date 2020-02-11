@@ -4,12 +4,12 @@
 
 using namespace Bee;
 
-std::unique_ptr<void*> Package::GetData() {
+std::unique_ptr<uint8_t[]> Package::GetData() {
 	// TODO - implement Package::GetData
 	throw "Not yet implemented";
 }
 
-void Package::SetData(std::unique_ptr<void[]> data, size_t size) {
+void Package::SetData(std::unique_ptr<uint8_t[]> data, size_t size) {
 	// TODO - implement Package::SetData
 	throw "Not yet implemented";
 }
@@ -19,20 +19,22 @@ size_t Package::GetSize() {
 	throw "Not yet implemented";
 }
 
-Buffer::Buffer(const uint8_t* buf /*copy this buf*/, size_t size)
+Buffer::Buffer(const uint8_t* buf, size_t size, size_t pack_num, size_t begin, size_t count)
 	:data_(nullptr),
 	size_(size),
-	pack_num_(0),
-	begin_(0),
-	count_(1) {
+	pack_num_(pack_num),
+	begin_(begin),
+	count_(count) {
 	if (size_ == 0) return;
+	size_ = size;
 	data_ = new uint8_t[size_+kBufferHeaderSize_];
-	InitBuffer(buf, size);
+	memcpy(data_+kBufferHeaderSize_, buf, size_);
+	InitHeader();
 }
 
-void Buffer::InitBuffer(const uint8_t* data, size_t size) {
+void Buffer::InitHeader() {
 	if (data_ == nullptr) return;
-	decltype(data_) buf;
+	decltype(data_) buf = data_;
 	memcpy(buf, &pack_num_, sizeof(pack_num_));
 	buf+= sizeof(pack_num_);
 	memcpy(buf, &begin_, sizeof(begin_));
@@ -40,13 +42,12 @@ void Buffer::InitBuffer(const uint8_t* data, size_t size) {
 	memcpy(buf, &count_, sizeof(count_));
 	buf+= sizeof(count_);
 	memcpy(buf, &size_, sizeof(size_));
-	buf+= sizeof(size_);
-	memcpy(buf, data, size);
 }
 
 
 
 uint8_t* Buffer::GetBufferData() {
+	InitHeader();
 	return data_;
 }
 
@@ -62,8 +63,12 @@ size_t Buffer::GetDataSize() {
 	return size_;
 }
 
-void Buffer::SetData(const uint8_t* data, size_t size) {
+void Buffer::SetData(const uint8_t* data, size_t size, size_t pack_num, size_t begin, size_t count) {
 	if (data_) delete  data_;
-	data_ = new uint8_t[size_];
-	InitBuffer(data, size);
+	size_ = size;
+	pack_num_ = pack_num;
+	begin_ = begin;
+	count_ = count;
+	data_ = new uint8_t[size_+kBufferHeaderSize_];
+	memcpy(data_+kBufferHeaderSize_, data, size_);
 }

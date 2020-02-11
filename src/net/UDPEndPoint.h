@@ -7,7 +7,7 @@ namespace Bee {
 	struct UDPEndPoint {
 		std::string IP;
 		short port;
-		bool operator< (UDPEndPoint& other) {
+		bool operator< (const UDPEndPoint& other) const  {
 			if (IP == other.IP) return port < other.port;
 			else return IP < other.IP;
 		}

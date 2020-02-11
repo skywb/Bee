@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.2)
 
 project(Bee)
 
-set(INC_DIR net package recover service)
+set(INC_DIR net package recover service log)
 include_directories(.)
 
 set(SRC_FILES 
@@ -15,3 +15,4 @@ set(SRC_FILES
 	)
 
 add_library(Bee ${SRC_FILES})
+

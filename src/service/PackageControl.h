@@ -3,12 +3,16 @@
 
 #include "package/Package.h"
 
+#include <queue>
+#include <functional>
+#include <map>
+
 namespace Bee {
 	class PackageControl {
 
 	private:
 		std::map<int, std::unique_ptr<Buffer>> pack_received_;
-		std::funtional<void(std::unique_ptr<Package>)> OnPackageArrivedCallback_;
+		std::function<void(std::unique_ptr<Package>)> OnPackageArrivedCallback_;
 		std::queue<Package> package_completed_;
 
 	public:

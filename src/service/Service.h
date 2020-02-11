@@ -2,9 +2,14 @@
 #define SERVICE_H
 
 #include "recover/RecoverManager.h"
+#include "net/UDPSender.h"
+#include "net/UDPReceiver.h"
+#include "PackageControl.h"
+
+#include <queue>
 
 namespace Bee {
-	class Service : SenderDelgate, SenderDelgate {
+	class Service {
 
 	private:
 		std::unique_ptr<RecoverManager> recover_manager_;

@@ -14,14 +14,15 @@ namespace Bee {
 	private:
 		std::map<size_t, std::shared_ptr<Buffer>> package_history_;
 		std::mutex mutex_package_history_;
+		boost::asio::io_service& service_;
 		boost::asio::deadline_timer timer_pack_outtime_;
 
 	public:
+		RecoverManager(boost::asio::io_service& service);
+
 		void PackageArrived(size_t package_num);
 
 		void AddPackRecord(size_t packnum);
-
-		RecoverManager(boost::asio::io_service& service);
 
 	private:
 		void AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer> pack_data);

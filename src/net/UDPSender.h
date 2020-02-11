@@ -21,7 +21,7 @@ namespace Bee {
 			std::chrono::time_point<std::chrono::system_clock> time_;
 			bool is_multicast_ = false;
 		};
-		std::chrono::duration<std::chrono::milliseconds> heart_rate_;
+		std::chrono::milliseconds heart_rate_;
 		std::map<UDPEndPoint, type_client> endpoints_;
 		std::mutex mutex_endpoints_;
 		boost::asio::ip::udp::socket& socket_;
