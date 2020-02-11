@@ -2,6 +2,7 @@
 #define UDPSENDER_H
 
 #include "UDPEndPoint.h"
+#include "package/Package.h"
 
 #include <map>
 
@@ -11,16 +12,28 @@ namespace Bee {
 	class UDPSender {
 
 	private:
-		std::map<UDPEndPoint, boost::asio::ip::udp::endpoint> endpoints_;
+		struct type_client {
+			type_client(UDPEndPoint endpoint) : 
+				endpoint_(boost::asio::ip::address::from_string(endpoint.IP), endpoint.port) {
+					time_ = std::chrono::system_clock::now();
+			}
+			boost::asio::ip::udp::endpoint endpoint_;
+			std::chrono::time_point<std::chrono::system_clock> time_;
+			bool is_multicast_ = false;
+		};
+		std::chrono::duration<std::chrono::milliseconds> heart_rate_;
+		std::map<UDPEndPoint, type_client> endpoints_;
+		std::mutex mutex_endpoints_;
 		boost::asio::ip::udp::socket& socket_;
-		int heart_rate_;
 
 	public:
-		void SetHeartRate();
+		UDPSender(boost::asio::ip::udp::socket& socket);
 
-		void AddClient(int UDPEndPoint_endpoint);
+		void SendBuffer(std::shared_ptr<Buffer> buf);
 
-		void RemoveClient(int UDPEndPoint_endpoint);
+		void SetHeartRate(unsigned int rate);
+		void AddClient(UDPEndPoint endpoint);
+		void RemoveClient(UDPEndPoint endpoint);
 
 	private:
 		void ClearOutTimeClient();
