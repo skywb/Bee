@@ -19,32 +19,27 @@ size_t Package::GetSize() {
 	throw "Not yet implemented";
 }
 
-Buffer::Buffer(const uint8_t* buf, size_t size, size_t pack_num, size_t begin, size_t count)
-	:data_(nullptr),
-	size_(size),
-	pack_num_(pack_num),
-	begin_(begin),
-	count_(count) {
-	if (size_ == 0) return;
-	size_ = size;
-	data_ = new uint8_t[size_+kBufferHeaderSize_];
-	memcpy(data_+kBufferHeaderSize_, buf, size_);
-	InitHeader();
+Buffer::Buffer(const uint8_t* buf, size_t size)
+	:data_(nullptr) {
+		if (size < kBufferHeaderSize_) return;
+		data_ = new uint8_t[size];
+		memcpy(&header_, data_, sizeof(header_));
 }
 
-void Buffer::InitHeader() {
-	if (data_ == nullptr) return;
-	decltype(data_) buf = data_;
-	memcpy(buf, &pack_num_, sizeof(pack_num_));
-	buf+= sizeof(pack_num_);
-	memcpy(buf, &begin_, sizeof(begin_));
-	buf+=sizeof(begin_);
-	memcpy(buf, &count_, sizeof(count_));
-	buf+= sizeof(count_);
-	memcpy(buf, &size_, sizeof(size_));
+Buffer::~Buffer() {
+	if (data_) delete[] data_;
 }
 
-
+void Buffer::SetData(const uint8_t* data, size_t size) {
+	if (data_) delete  data_;
+	header_.size = size;
+	data_ = new uint8_t[header_.size+kBufferHeaderSize_];
+	if (header_.size == 0) {
+		return;
+	} else {
+		memcpy(data_+kBufferHeaderSize_, data, header_.size);
+	}
+}
 
 uint8_t* Buffer::GetBufferData() {
 	InitHeader();
@@ -52,7 +47,7 @@ uint8_t* Buffer::GetBufferData() {
 }
 
 size_t Buffer::GetBufferSize() {
-	return size_+kBufferHeaderSize_;
+	return header_.size+kBufferHeaderSize_;
 }
 
 uint8_t* Buffer::GetData() {
@@ -60,15 +55,6 @@ uint8_t* Buffer::GetData() {
 }
 
 size_t Buffer::GetDataSize() {
-	return size_;
+	return header_.size;
 }
 
-void Buffer::SetData(const uint8_t* data, size_t size, size_t pack_num, size_t begin, size_t count) {
-	if (data_) delete  data_;
-	size_ = size;
-	pack_num_ = pack_num;
-	begin_ = begin;
-	count_ = count;
-	data_ = new uint8_t[size_+kBufferHeaderSize_];
-	memcpy(data_+kBufferHeaderSize_, data, size_);
-}
