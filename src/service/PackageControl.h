@@ -10,9 +10,12 @@
 namespace Bee {
 	class PackageControl {
 
+	public:
+		typedef std::function<void(std::unique_ptr<Package>)> PackageArrivedCallback;
+
 	private:
 		std::map<int, std::unique_ptr<Buffer>> pack_received_;
-		std::function<void(std::unique_ptr<Package>)> OnPackageArrivedCallback_;
+		PackageArrivedCallback OnPackageArrivedCallback_;
 		std::queue<Package> package_completed_;
 
 	public:
@@ -20,7 +23,9 @@ namespace Bee {
 
 		void BuildUpPackage();
 
-		std::vector<Buffer>&& SplitPackage(Package package);
+		std::vector<std::unique_ptr<Buffer>>&& SplitPackage(std::unique_ptr<Package> package);
+
+		void SetPackageArrivedCallback(PackageArrivedCallback callback) { OnPackageArrivedCallback_ = callback; }
 	};
 }
 

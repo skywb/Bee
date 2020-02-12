@@ -12,7 +12,7 @@ void PackageControl::BuildUpPackage() {
 	throw "Not yet implemented";
 }
 
-std::vector<Buffer>&& PackageControl::SplitPackage(Package package) {
+std::vector<std::unique_ptr<Buffer>>&& PackageControl::SplitPackage(std::unique_ptr<Package> package) {
 	// TODO - implement PackageControl::SplitPackage
 	throw "Not yet implemented";
 }

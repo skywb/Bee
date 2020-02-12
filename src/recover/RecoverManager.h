@@ -22,15 +22,15 @@ namespace Bee {
 
 		void PackageArrived(size_t package_num);
 
-		void AddPackRecord(size_t packnum);
+		void AddPackRecord(std::shared_ptr<Buffer> buf);
+
+		std::shared_ptr<Buffer> NACKReceived(size_t pack_num);
 
 	private:
 		void AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer> pack_data);
 
 		void ClearOutTimeHistory();
 
-	public:
-		std::shared_ptr<Buffer> NACKReceived(size_t pack_num);
 	};
 }
 
