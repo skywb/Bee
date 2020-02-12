@@ -1,4 +1,5 @@
 #include "Service.h"
+#include "service/mlog.h"
 
 using namespace Bee;
 
@@ -56,11 +57,36 @@ void Service::SendPackage(std::unique_ptr<Package> package) {
 
 
 void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer) {
-	// TODO - implement Service::ReceivedHandler
-	throw "Not yet implemented";
+	switch (buffer->GetBufferHeader().type) {
+		case BufferType::DATA:
+			OnDataRecived(std::move(buffer));
+			break;
+		case BufferType::NACK:
+			OnNACKRecived(std::move(buffer));
+			break;
+		case BufferType::BUFFER_NOT_FOUND:
+			OnNotFoundPackRecived(std::move(buffer));
+			break;
+		default:
+			LOG_ERROR << "not found this type";
+	}
 }
 
 void Service::GetRTT() {
 	// TODO - implement Service::GetRTT
 	throw "Not yet implemented";
 }
+
+void Service::OnDataRecived(std::unique_ptr<Buffer> buf) {
+	recover_manager_->PackageArrived(buf->GetBufferHeader().pack_num);
+	package_control_->OnReceivedPack(std::move(buf));
+}
+
+void Service::OnNACKRecived(std::unique_ptr<Buffer> buf) {
+	recover_manager_->NACKReceived(buf->GetBufferHeader().pack_num);
+}
+
+void Service::OnNotFoundPackRecived(std::unique_ptr<Buffer> buf) {
+	package_control_->OnPackNotFound(buf->GetBufferHeader().pack_num);
+}
+

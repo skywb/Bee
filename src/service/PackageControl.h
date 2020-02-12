@@ -20,6 +20,7 @@ namespace Bee {
 
 	public:
 		void OnReceivedPack(std::unique_ptr<Buffer> buffer);
+		void OnPackNotFound(size_t pack_num);
 
 		void BuildUpPackage();
 

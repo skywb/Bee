@@ -47,6 +47,9 @@ namespace Bee {
 	
 	private:
 		void BufferNotFound();
+		void OnDataRecived(std::unique_ptr<Buffer> buf);
+		void OnNACKRecived(std::unique_ptr<Buffer> buf);
+		void OnNotFoundPackRecived(std::unique_ptr<Buffer> buf);
 	};
 }
 
