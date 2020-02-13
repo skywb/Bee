@@ -3,7 +3,7 @@
 
 using namespace Bee;
 
-UDPReceiver::UDPReceiver(boost::asio::ip::udp::socket& socket, type_callback fun)
+UDPReceiver::UDPReceiver(boost::asio::ip::udp::socket& socket, TypeCallback fun)
    	: socket_(socket),
 	receive_callback_(fun),
 	buf_(new uint8_t[1500]){ }
@@ -20,7 +20,10 @@ void UDPReceiver::AsyncReceive() {
 					AsyncReceive();
 				}
 				auto buf = std::make_unique<Buffer> (buf_, size);
-				receive_callback_(std::move(buf));
+				UDPEndPoint endpoint;
+				endpoint.IP = remote_endpoint_.address().to_string();
+				endpoint.port = remote_endpoint_.port();
+				receive_callback_(std::move(buf), endpoint);
 				AsyncReceive();
 			});
 }

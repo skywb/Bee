@@ -3,18 +3,25 @@
 
 using namespace Bee;
 
-Service::Service() {
+Service::Service() :
+	socket_(service_) {
+
 	package_control_ = std::make_unique<PackageControl> ();
-	recover_manager_ = std::make_unique<RecoverManager> ();
-	receiver_ = std::make_unique<UDPReceiver> ();
-	sender_ = std::make_unique<UDPSender> ();
+	recover_manager_ = std::make_unique<RecoverManager> (service_, [&](std::shared_ptr<Buffer> buf, UDPEndPoint endpoint) {
+			sender_->SendBufferTo(buf, endpoint);
+			});
+
+	receiver_ = std::make_unique<UDPReceiver> (socket_,
+		   	std::bind(&Service::ReceivedHandler, this, std::placeholders::_1, std::placeholders::_2));
+
+	sender_ = std::make_unique<UDPSender> (socket_);
 }
 
 // Only for Unittest
 Service::Service(std::unique_ptr<PackageControl> package_control, 
 		std::unique_ptr<RecoverManager> recover_manager,
 		std::unique_ptr<UDPReceiver> receiver,
-		std::unique_ptr<UDPSender> sender) {
+		std::unique_ptr<UDPSender> sender) : socket_(service_) {
 	if (package_control)
 		package_control_ = std::move(package_control);
 	else 
@@ -23,17 +30,20 @@ Service::Service(std::unique_ptr<PackageControl> package_control,
 	if (recover_manager)
 		recover_manager_ = std::move(recover_manager);
 	else 
-		recover_manager_ = std::make_unique<RecoverManager> ();
+		recover_manager_ = std::make_unique<RecoverManager> (service_, [&](std::shared_ptr<Buffer> buf, UDPEndPoint endpoint) {
+				sender_->SendBufferTo(buf, endpoint);
+				});
 
 	if (receiver)
 		receiver_ = std::move(receiver);
 	else 
-		receiver_ = std::make_unique<UDPReceiver> ();
+		receiver_ = std::make_unique<UDPReceiver> (socket_,
+				std::bind(&Service::ReceivedHandler, this, std::placeholders::_1, std::placeholders::_2));
 
 	if (sender)
 		sender_ = std::move(sender);
 	else 
-		sender_ = std::make_unique<UDPSender> ();
+		sender_ = std::make_unique<UDPSender> (socket_);
 }
 
 
@@ -49,20 +59,20 @@ void Service::Init(int thread_count) {
 void Service::SendPackage(std::unique_ptr<Package> package) {
 	auto buffers = std::move(package_control_->SplitPackage(std::move(package)));
 	for (int i=0; i<buffers.size(); ++i) {
-		auto buffer = std::make_shared<Buffer> (buffers[i].release());
+		std::shared_ptr<Buffer> buffer(buffers[i].release());
 		sender_->SendBuffer(buffer);
 		recover_manager_->AddPackRecord(buffer);
 	}
 }
 
 
-void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer) {
+void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint) {
 	switch (buffer->GetBufferHeader().type) {
 		case BufferType::DATA:
 			OnDataRecived(std::move(buffer));
 			break;
 		case BufferType::NACK:
-			OnNACKRecived(std::move(buffer));
+			OnNACKRecived(std::move(buffer), endpoint);
 			break;
 		case BufferType::BUFFER_NOT_FOUND:
 			OnNotFoundPackRecived(std::move(buffer));
@@ -82,8 +92,8 @@ void Service::OnDataRecived(std::unique_ptr<Buffer> buf) {
 	package_control_->OnReceivedPack(std::move(buf));
 }
 
-void Service::OnNACKRecived(std::unique_ptr<Buffer> buf) {
-	recover_manager_->NACKReceived(buf->GetBufferHeader().pack_num);
+void Service::OnNACKRecived(std::unique_ptr<Buffer> buf, UDPEndPoint endpoint) {
+	recover_manager_->NACKReceived(buf->GetBufferHeader().pack_num, endpoint);
 }
 
 void Service::OnNotFoundPackRecived(std::unique_ptr<Buffer> buf) {

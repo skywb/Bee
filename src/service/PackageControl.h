@@ -19,6 +19,8 @@ namespace Bee {
 		std::queue<Package> package_completed_;
 
 	public:
+		PackageControl() {}
+		virtual ~PackageControl() {}
 		void OnReceivedPack(std::unique_ptr<Buffer> buffer);
 		void OnPackNotFound(size_t pack_num);
 

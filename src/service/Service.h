@@ -13,6 +13,7 @@ namespace Bee {
 
 	private:
 		boost::asio::io_service service_;
+		boost::asio::ip::udp::socket socket_;
 		std::vector<std::thread> threads_;
 
 		std::unique_ptr<PackageControl> package_control_;
@@ -39,7 +40,7 @@ namespace Bee {
 
 		void SendPackage(std::unique_ptr<Package> package);
 
-		void ReceivedHandler(std::unique_ptr<Buffer> buffer);
+		void ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint);
 
 		void GetRTT();
 
@@ -48,7 +49,7 @@ namespace Bee {
 	private:
 		void BufferNotFound();
 		void OnDataRecived(std::unique_ptr<Buffer> buf);
-		void OnNACKRecived(std::unique_ptr<Buffer> buf);
+		void OnNACKRecived(std::unique_ptr<Buffer> buf, UDPEndPoint endpoint);
 		void OnNotFoundPackRecived(std::unique_ptr<Buffer> buf);
 	};
 }

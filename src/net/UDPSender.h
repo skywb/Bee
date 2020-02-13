@@ -30,6 +30,7 @@ namespace Bee {
 		UDPSender(boost::asio::ip::udp::socket& socket);
 
 		void SendBuffer(std::shared_ptr<Buffer> buf);
+		void SendBufferTo(std::shared_ptr<Buffer> buf, UDPEndPoint endpoint);
 
 		void SetHeartRate(unsigned int rate);
 		void AddClient(UDPEndPoint endpoint);
