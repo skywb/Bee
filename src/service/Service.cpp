@@ -89,7 +89,7 @@ void Service::GetRTT() {
 
 void Service::OnDataRecived(std::unique_ptr<Buffer> buf) {
 	recover_manager_->PackageArrived(buf->GetBufferHeader().pack_num);
-	package_control_->OnReceivedPack(std::move(buf));
+	package_control_->OnReceivedBuffer(std::move(buf));
 }
 
 void Service::OnNACKRecived(std::unique_ptr<Buffer> buf, UDPEndPoint endpoint) {
@@ -97,6 +97,6 @@ void Service::OnNACKRecived(std::unique_ptr<Buffer> buf, UDPEndPoint endpoint) {
 }
 
 void Service::OnNotFoundPackRecived(std::unique_ptr<Buffer> buf) {
-	package_control_->OnPackNotFound(buf->GetBufferHeader().pack_num);
+	package_control_->OnBufferNotFound(buf->GetBufferHeader().pack_num);
 }
 

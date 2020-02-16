@@ -10,7 +10,7 @@ namespace Bee {
 	private:
 		std::size_t size_;
 		std::unique_ptr<uint8_t[]> data_;
-		bool is_complete_package_ = true;
+		bool is_complete_package_ = false;
 	public:
 		std::unique_ptr<uint8_t[]> GetData();
 
