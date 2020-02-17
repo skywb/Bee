@@ -5,18 +5,22 @@
 using namespace Bee;
 
 std::unique_ptr<uint8_t[]> Package::GetData() {
-	// TODO - implement Package::GetData
-	throw "Not yet implemented";
+	return std::move(data_);
 }
 
 void Package::SetData(std::unique_ptr<uint8_t[]> data, size_t size) {
-	// TODO - implement Package::SetData
-	throw "Not yet implemented";
+	size_ = size;
+	data_ = std::move(data);
+}
+
+void Package::SetData(const char* buf, size_t size) {
+	data_ = std::make_unique<uint8_t[]> (size);
+	size_ =  size;
+	memcpy(data_.get(), buf, size);
 }
 
 size_t Package::GetSize() {
-	// TODO - implement Package::GetSize
-	throw "Not yet implemented";
+	return size_;
 }
 
 Buffer::Buffer(const uint8_t* buf, size_t size)

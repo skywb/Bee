@@ -35,7 +35,7 @@ void PackageControl::OnBufferNotFound(size_t pack_num) {
 	LOG_WARN << "buffer not found";
 }
 
-std::vector<std::unique_ptr<Buffer>>&& PackageControl::SplitPackage(std::unique_ptr<Package> package) {
+std::vector<std::unique_ptr<Buffer>> PackageControl::SplitPackage(std::unique_ptr<Package> package) {
 	std::vector<std::unique_ptr<Buffer>> buffers;
 	auto* buf = package->GetData().get();
 	size_t size = package->GetSize();
@@ -43,23 +43,21 @@ std::vector<std::unique_ptr<Buffer>>&& PackageControl::SplitPackage(std::unique_
 	int buffer_cnt = size / Buffer::GetMaxSizeOfNotSplit();
 	if (buffer_cnt * Buffer::GetMaxSizeOfNotSplit() < size) ++buffer_cnt;
 	size_t begin_num = current_buffer_number_;
-	while (size >= 0) {
-		buffers.emplace_back();
-		auto it = buffers.rbegin();
+	while (size > 0) {
+		auto buffer = std::make_unique<Buffer> ();
 		if (size >= Buffer::GetMaxSizeOfNotSplit()) {
-			auto& cur = *(*it);
-			cur.SetData(buf, Buffer::GetMaxSizeOfNotSplit());
+			buffer->SetData(buf, Buffer::GetMaxSizeOfNotSplit());
 			buf += Buffer::GetMaxSizeOfNotSplit();
 			size -= Buffer::GetMaxSizeOfNotSplit();
 		} else {
-			auto& cur = *(*it);
-			cur.SetData(buf, size);
+			buffer->SetData(buf, size);
+			size = 0;
 		}
-		auto& cur = *(*it);
-		cur.SetPackNum(current_buffer_number_);
+		buffer->SetPackNum(current_buffer_number_);
 		++current_buffer_number_;
-		cur.SetBegin(begin_num);
-		cur.SetCount(buffer_cnt);
+		buffer->SetBegin(begin_num);
+		buffer->SetCount(buffer_cnt);
+		buffers.emplace_back(std::move(buffer));
 	}
 	return std::move(buffers);
 }

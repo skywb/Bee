@@ -16,3 +16,12 @@ set(SRC_FILES
 
 add_library(Bee ${SRC_FILES})
 
+
+add_executable(Demo Demo.cpp)
+
+set(LIBS pthread)
+
+target_link_libraries(Demo Bee)
+target_link_libraries(Demo ${LIBS})
+
+add_definitions("-g")

@@ -15,6 +15,7 @@ namespace Bee {
 		std::unique_ptr<uint8_t[]> GetData();
 
 		void SetData(std::unique_ptr<uint8_t[]> data, size_t size);
+		void SetData(const char* buf, size_t size);
 
 		size_t GetSize();
 	};

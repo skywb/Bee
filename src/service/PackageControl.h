@@ -40,7 +40,7 @@ namespace Bee {
 		virtual ~PackageControl() {}
 		void OnReceivedBuffer(std::unique_ptr<Buffer> buffer);
 		void OnBufferNotFound(size_t pack_num);
-		std::vector<std::unique_ptr<Buffer>>&& SplitPackage(std::unique_ptr<Package> package);
+		std::vector<std::unique_ptr<Buffer>> SplitPackage(std::unique_ptr<Package> package);
 		void SetPackageArrivedCallback(PackageArrivedCallback callback) { OnPackageArrivedCallback_ = callback; }
 	};
 

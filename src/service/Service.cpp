@@ -5,41 +5,46 @@ using namespace Bee;
 
 Service::Service() :
 	socket_(service_) {
-
 	package_control_ = std::make_unique<PackageControl> ();
 	recover_manager_ = std::make_unique<RecoverManager> (service_, [&](std::shared_ptr<Buffer> buf, UDPEndPoint endpoint) {
 			sender_->SendBufferTo(buf, endpoint);
 			});
-
 	receiver_ = std::make_unique<UDPReceiver> (socket_,
 		   	std::bind(&Service::ReceivedHandler, this, std::placeholders::_1, std::placeholders::_2));
-
 	sender_ = std::make_unique<UDPSender> (socket_);
 }
 
+Service::~Service() {
+	if (!service_.stopped())
+		service_.stop();
+	for (int i = 0; i < threads_.size(); ++i) {
+		if (threads_[i].joinable()) {
+			threads_[i].join();
+		}
+	}
+}
+
 // Only for Unittest
-Service::Service(std::unique_ptr<PackageControl> package_control, 
+Service::Service(bool is_unittest, std::unique_ptr<PackageControl> package_control, 
 		std::unique_ptr<RecoverManager> recover_manager,
 		std::unique_ptr<UDPReceiver> receiver,
 		std::unique_ptr<UDPSender> sender) : socket_(service_) {
+	assert(is_unittest);
 	if (package_control)
 		package_control_ = std::move(package_control);
 	else 
 		package_control_ = std::make_unique<PackageControl> ();
-
 	if (recover_manager)
 		recover_manager_ = std::move(recover_manager);
 	else 
 		recover_manager_ = std::make_unique<RecoverManager> (service_, [&](std::shared_ptr<Buffer> buf, UDPEndPoint endpoint) {
 				sender_->SendBufferTo(buf, endpoint);
 				});
-
 	if (receiver)
 		receiver_ = std::move(receiver);
 	else 
 		receiver_ = std::make_unique<UDPReceiver> (socket_,
 				std::bind(&Service::ReceivedHandler, this, std::placeholders::_1, std::placeholders::_2));
-
 	if (sender)
 		sender_ = std::move(sender);
 	else 
@@ -47,13 +52,35 @@ Service::Service(std::unique_ptr<PackageControl> package_control,
 }
 
 
-void Service::Init(int thread_count) {
+void Service::SetThreadCount(int thread_count) {
 	for (int i = 0; i < thread_count; ++i) {
 		threads_.emplace_back([&]() {
 				boost::asio::io_service::work work(service_);
 				service_.run();
 				});
 	}
+}
+
+void Service::SetLocalAddress(const std::string IP, const short port)  {
+	boost::asio::ip::udp::endpoint local_endpoint(boost::asio::ip::address::from_string(IP), port);
+	boost::system::error_code error;
+	socket_.open(local_endpoint.protocol(), error);
+	if (error) {
+		LOG_WARN << "socket open error : " << error.message();
+	}
+	//socket_.set_option(boost::asio::ip::udp::socket::send_buffer_size(1024*800));
+	socket_.bind(local_endpoint, error);
+	if (error) {
+		LOG_WARN << "bind error : " << error.message();
+	}
+}
+
+void Service::Run() {
+
+}
+
+void Service::Stop() {
+	service_.stop();
 }
 
 void Service::SendPackage(std::unique_ptr<Package> package) {

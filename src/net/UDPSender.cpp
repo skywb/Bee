@@ -11,6 +11,8 @@ UDPSender::UDPSender(boost::asio::ip::udp::socket& socket):
 }
 
 void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf) {
+	LOG_DEBUG << "Send Buffer";
+	std::cout << "Send Buffer" << std::endl;
 	std::lock_guard<std::mutex> lock(mutex_endpoints_);
 	for (auto i : endpoints_) {
 		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()), i.second.endpoint_,
@@ -18,8 +20,20 @@ void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf) {
 					if (error) {
 						LOG_ERROR << "Send error : " << error.message();
 					}
+					std::cout << "Send end" << std::endl;
 				});
 	}
+}
+
+void UDPSender::SendBufferTo(std::shared_ptr<Buffer> buf, UDPEndPoint endpoint) {
+	boost::asio::ip::udp::endpoint ep(boost::asio::ip::address::from_string(endpoint.IP), endpoint.port);
+	socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()), ep, 
+			[=](const boost::system::error_code& error, size_t size) {
+				auto tmp = buf;	
+				if (error) {
+					LOG_ERROR << "Send error : " << error.message();
+				}
+			});
 }
 
 void UDPSender::SetHeartRate(unsigned int rate) {
