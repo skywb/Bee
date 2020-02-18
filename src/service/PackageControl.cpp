@@ -37,7 +37,7 @@ void PackageControl::OnBufferNotFound(size_t pack_num) {
 
 std::vector<std::unique_ptr<Buffer>> PackageControl::SplitPackage(std::unique_ptr<Package> package) {
 	std::vector<std::unique_ptr<Buffer>> buffers;
-	auto* buf = package->GetData().get();
+	auto buf = package->GetData();
 	size_t size = package->GetSize();
 	if (size <= 0) return std::move(buffers);
 	int buffer_cnt = size / Buffer::GetMaxSizeOfNotSplit();

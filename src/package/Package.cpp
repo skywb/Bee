@@ -4,8 +4,9 @@
 
 using namespace Bee;
 
-std::unique_ptr<uint8_t[]> Package::GetData() {
-	return std::move(data_);
+const uint8_t* Package::GetData() {
+	//return std::move(data_);
+	return data_.get();
 }
 
 void Package::SetData(std::unique_ptr<uint8_t[]> data, size_t size) {

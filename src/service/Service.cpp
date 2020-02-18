@@ -87,7 +87,6 @@ void Service::SetLocalAddress(const std::string IP, const short port)  {
 }
 
 void Service::Run() {
-
 }
 
 void Service::Stop() {
@@ -146,6 +145,18 @@ void Service::AddClient(const std::string IP, const short port) {
 	sender_->AddClient(UDPEndPoint{IP,port});
 }
 
+void Service::RemoveClient(const std::string IP, const short port) {
+	sender_->RemoveClient(UDPEndPoint{IP,port});
+}
+
 void Service::ConnectService(const std::string IP, const short port) {
+
+}
+ 
+void Service::DeConnectService(const std::string IP, const short port) {
+
+}
+
+void Service::Request(std::unique_ptr<Package> package, UDPEndPoint endpoint) {
 
 }

@@ -28,6 +28,7 @@ namespace Bee {
 
 	public:
 		UDPSender(boost::asio::ip::udp::socket& socket);
+		~UDPSender();
 
 		void SendBuffer(std::shared_ptr<Buffer> buf);
 		void SendBufferTo(std::shared_ptr<Buffer> buf, UDPEndPoint endpoint);

@@ -6,6 +6,7 @@
 #include <queue>
 #include <functional>
 #include <map>
+#include <iostream>
 
 namespace Bee {
 
@@ -36,7 +37,7 @@ namespace Bee {
 		size_t current_buffer_number_ = 0;
 
 	public:
-		PackageControl() {}
+		PackageControl() { }
 		virtual ~PackageControl() {}
 		void OnReceivedBuffer(std::unique_ptr<Buffer> buffer);
 		void OnBufferNotFound(size_t pack_num);

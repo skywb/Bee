@@ -6,6 +6,7 @@ set(INC_DIR net package recover service log)
 include_directories(.)
 
 set(SRC_FILES 
+	client/Bee.cpp
 	net/UDPSender.cpp
 	net/UDPReceiver.cpp
 	package/Package.cpp

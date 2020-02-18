@@ -1,7 +1,6 @@
 #include "UDPSender.h"
 #include "log/mlog.hpp"
 #include <boost/asio.hpp>
-#include <iostream>
 
 using namespace Bee;
 
@@ -10,17 +9,18 @@ UDPSender::UDPSender(boost::asio::ip::udp::socket& socket):
 		heart_rate_ = std::chrono::milliseconds(1000);
 }
 
+UDPSender::~UDPSender() { }
+
 void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf) {
-	LOG_DEBUG << "Send Buffer";
-	std::cout << "Send Buffer" << std::endl;
 	std::lock_guard<std::mutex> lock(mutex_endpoints_);
 	for (auto i : endpoints_) {
 		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()), i.second.endpoint_,
 				[buf](const boost::system::error_code& error, std::size_t size) {
+					auto foo = buf;
 					if (error) {
 						LOG_ERROR << "Send error : " << error.message();
 					}
-					std::cout << "Send end" << std::endl;
+					LOG_INFO << "send end";
 				});
 	}
 }
