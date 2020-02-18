@@ -9,7 +9,17 @@
 #include <queue>
 
 namespace Bee {
-	class Service {
+	class Service : public RecoverManager::Interface {
+	public:
+		//override RecoverManager::Interface
+		void SendNack(const size_t package_num) override;
+		void SendPackageTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint) override;
+
+		static Service& GetService() {
+			static Service instance;
+			return instance;
+		}
+
 	private:
 		boost::asio::io_service service_;
 		boost::asio::ip::udp::socket socket_;
@@ -19,14 +29,12 @@ namespace Bee {
 		std::unique_ptr<UDPReceiver> receiver_;
 		std::unique_ptr<UDPSender> sender_;
 		std::queue<Package> package_queue_;
+
 	public:
 		Service();
-		// Only for Unittest
-		Service(bool is_unittest, std::unique_ptr<PackageControl> package_control = nullptr, 
-				std::unique_ptr<RecoverManager> recover_manager = nullptr,
-				std::unique_ptr<UDPReceiver> receiver = nullptr,
-				std::unique_ptr<UDPSender> sender = nullptr);
 		~Service();
+		void Init();
+
 		void SetThreadCount(int thread_count);
 		void SetPackageArrivedCallback(PackageControl::PackageArrivedCallback callback) {
 			package_control_->SetPackageArrivedCallback(callback);
@@ -34,10 +42,20 @@ namespace Bee {
 		void SetLocalAddress(const std::string IP, const short port);
 		void Run();
 		void Stop();
+
 		void SendPackage(std::unique_ptr<Package> package);
 		void ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint);
 		void GetRTT();
 		void SetBufferOutTime(int ms); //ms
+		void AddClient(const std::string IP, const short port);
+		void RemoveClient(const std::string IP, const short port);
+		void ConnectService(const std::string IP, const short port);
+		void DeConnectService(const std::string IP, const short port);
+		void Request(std::unique_ptr<Package> package, UDPEndPoint endpoint = UDPEndPoint{"0.0.0.0", 0});
+		//boost::asio::io_service& GetIOService() {
+		//	return service_;
+		//}
+
 	private:
 		void BufferNotFound();
 		void OnDataRecived(std::unique_ptr<Buffer> buf);

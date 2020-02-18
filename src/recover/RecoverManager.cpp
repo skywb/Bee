@@ -2,6 +2,15 @@
 
 using namespace Bee;
 
+RecoverManager::RecoverManager(boost::asio::io_service& service, Interface* sender) : 
+	service_(service),
+	sender_(sender),
+	timer_pack_outtime_(service) { }
+
+RecoverManager::~RecoverManager() {
+	timer_pack_outtime_.cancel();
+}
+
 void RecoverManager::PackageArrived(size_t package_num) {
 	if (is_first_pack_num) {
 		min_pack_num_ = package_num;
@@ -58,18 +67,6 @@ void RecoverManager::AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer
 	package_history_.emplace(package_num, pack_data);
 }
 
-
-RecoverManager::RecoverManager(boost::asio::io_service& service, SenderCallback sender)
-	: service_(service),
-	timer_pack_outtime_(service_),
-	sender_(sender) {
-
-}
-
-RecoverManager::~RecoverManager() {
-
-}
-
 void RecoverManager::ClearOutTimeHistory() {
 	int cnt = 1000 - package_history_.size();
 	if (cnt > 0)  {
@@ -92,5 +89,5 @@ std::shared_ptr<Buffer> RecoverManager::GetHistory(size_t pack_num) {
 
 void RecoverManager::NACKReceived(size_t pack_num, UDPEndPoint endpoint) {
 	auto pack = GetHistory(pack_num);
-	sender_(pack, endpoint);
+	sender_->SendPackageTo(pack, endpoint);
 }
