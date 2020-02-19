@@ -25,7 +25,8 @@ namespace Bee {
 	enum BufferType {
 		DATA = 1,
 		NACK = 2,
-		BUFFER_NOT_FOUND = 3
+		BUFFER_NOT_FOUND = 3,
+		HEARTBEAT = 4
 	};
 	struct BufferHeader {
 		size_t pack_num;

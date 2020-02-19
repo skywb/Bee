@@ -87,6 +87,7 @@ void Service::SetLocalAddress(const std::string IP, const short port)  {
 }
 
 void Service::Run() {
+	receiver_->AsyncReceive();
 }
 
 void Service::Stop() {
@@ -107,12 +108,20 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 	switch (buffer->GetBufferHeader().type) {
 		case BufferType::DATA:
 			OnDataRecived(std::move(buffer));
+			LOG_INFO << "DATA";
 			break;
 		case BufferType::NACK:
 			OnNACKRecived(std::move(buffer), endpoint);
+			LOG_INFO << "NACK";
 			break;
 		case BufferType::BUFFER_NOT_FOUND:
 			OnNotFoundPackRecived(std::move(buffer));
+			LOG_INFO << "BUFFER_NOT_FOUND";
+			break;
+		case BufferType::HEARTBEAT:
+			//OnNotFoundPackRecived(std::move(buffer));
+			OnHeartBeatReceived(endpoint);
+			LOG_INFO << "HEARTBEAT";
 			break;
 		default:
 			LOG_ERROR << "not found this type";
@@ -137,6 +146,11 @@ void Service::OnNotFoundPackRecived(std::unique_ptr<Buffer> buf) {
 	package_control_->OnBufferNotFound(buf->GetBufferHeader().pack_num);
 }
 
+void Service::OnHeartBeatReceived(const UDPEndPoint endpoint) {
+	/* TODO:  <19-02-20, yourname> */
+	LOG_INFO << "OnHeartBeatReceived";
+}
+
 void Service::SetBufferOutTime(int ms) {
 
 }
@@ -150,13 +164,11 @@ void Service::RemoveClient(const std::string IP, const short port) {
 }
 
 void Service::ConnectService(const std::string IP, const short port) {
-
+	receiver_->AddService(UDPEndPoint{IP,port});
 }
  
 void Service::DeConnectService(const std::string IP, const short port) {
-
 }
 
 void Service::Request(std::unique_ptr<Package> package, UDPEndPoint endpoint) {
-
 }

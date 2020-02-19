@@ -61,6 +61,7 @@ namespace Bee {
 		void OnDataRecived(std::unique_ptr<Buffer> buf);
 		void OnNACKRecived(std::unique_ptr<Buffer> buf, UDPEndPoint endpoint);
 		void OnNotFoundPackRecived(std::unique_ptr<Buffer> buf);
+		void OnHeartBeatReceived(const UDPEndPoint endpoint);
 	};
 }
 
