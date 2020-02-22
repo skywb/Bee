@@ -57,6 +57,7 @@ std::vector<std::unique_ptr<Buffer>> PackageControl::SplitPackage(std::unique_pt
 		++current_buffer_number_;
 		buffer->SetBegin(begin_num);
 		buffer->SetCount(buffer_cnt);
+		buffer->SetBufferType(BufferType::DATA);
 		buffers.emplace_back(std::move(buffer));
 	}
 	return std::move(buffers);

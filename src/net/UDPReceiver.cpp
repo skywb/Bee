@@ -50,7 +50,6 @@ void UDPReceiver::AsyncReceive() {
 					LOG_WARN << "receive error : " << error.message();
 					AsyncReceive();
 				}
-				LOG_INFO << "receive a package ";
 				auto buf = std::make_unique<Buffer> (buf_, size);
 				UDPEndPoint endpoint;
 				endpoint.IP = remote_endpoint_.address().to_string();

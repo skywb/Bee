@@ -39,6 +39,7 @@ namespace Bee {
 		void SetPackageArrivedCallback(PackageControl::PackageArrivedCallback callback) {
 			package_control_->SetPackageArrivedCallback(callback);
 		}
+
 		void SetLocalAddress(const std::string IP, const short port);
 		void Run();
 		void Stop();

@@ -36,6 +36,7 @@ namespace Bee {
 		void SetHeartRate(unsigned int rate);
 		void AddClient(UDPEndPoint endpoint);
 		void RemoveClient(UDPEndPoint endpoint);
+		bool Heartbeat(const UDPEndPoint endpoint);
 
 	private:
 		void ClearOutTimeClient();

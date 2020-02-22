@@ -76,3 +76,14 @@ void UDPSender::ClearOutTimeClient() {
 		}
 	}
 }
+
+bool UDPSender::Heartbeat(const UDPEndPoint endpoint) {
+	std::lock_guard<std::mutex> lock(mutex_endpoints_);
+	auto it = endpoints_.find(endpoint);
+	if (it == endpoints_.end()) 
+		return false;
+	else {
+		it->second.time_ = std::chrono::system_clock::now();
+		return true;
+	}
+}

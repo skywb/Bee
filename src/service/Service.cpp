@@ -75,6 +75,9 @@ void Service::SetThreadCount(int thread_count) {
 void Service::SetLocalAddress(const std::string IP, const short port)  {
 	boost::asio::ip::udp::endpoint local_endpoint(boost::asio::ip::address::from_string(IP), port);
 	boost::system::error_code error;
+	if (socket_.is_open() ) {
+		socket_.close();
+	}
 	socket_.open(local_endpoint.protocol(), error);
 	if (error) {
 		LOG_WARN << "socket open error : " << error.message();
@@ -121,7 +124,6 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 		case BufferType::HEARTBEAT:
 			//OnNotFoundPackRecived(std::move(buffer));
 			OnHeartBeatReceived(endpoint);
-			LOG_INFO << "HEARTBEAT";
 			break;
 		default:
 			LOG_ERROR << "not found this type";
@@ -147,8 +149,9 @@ void Service::OnNotFoundPackRecived(std::unique_ptr<Buffer> buf) {
 }
 
 void Service::OnHeartBeatReceived(const UDPEndPoint endpoint) {
-	/* TODO:  <19-02-20, yourname> */
-	LOG_INFO << "OnHeartBeatReceived";
+	if (!sender_->Heartbeat(endpoint)) {
+		sender_->AddClient(endpoint);
+	}
 }
 
 void Service::SetBufferOutTime(int ms) {
