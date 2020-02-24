@@ -1,9 +1,12 @@
 #include "Service.h"
 #include "service/mlog.h"
 
+#include <random>
+
 using namespace Bee;
 
 void Service::SendNack(const size_t package_num) {
+	LOG_DEBUG << "Send NACK";
 	auto buf = std::make_unique<Buffer> ();
 	buf->SetPackNum(package_num);
 	buf->SetBufferType(BufferType::NACK);
@@ -119,18 +122,22 @@ void Service::SendPackage(std::unique_ptr<Package> package) {
 
 
 void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint) {
+	std::random_device rd;
+	std::uniform_int_distribution<> dis(0,9);
 	switch (buffer->GetBufferHeader().type) {
 		case BufferType::DATA:
+			if (dis(rd) < 2) {
+				break;
+			}
 			OnDataRecived(std::move(buffer));
-			LOG_INFO << "DATA";
 			break;
 		case BufferType::NACK:
-			OnNACKRecived(std::move(buffer), endpoint);
 			LOG_INFO << "NACK";
+			OnNACKRecived(std::move(buffer), endpoint);
 			break;
 		case BufferType::BUFFER_NOT_FOUND:
-			OnNotFoundPackRecived(std::move(buffer));
 			LOG_INFO << "BUFFER_NOT_FOUND";
+			OnNotFoundPackRecived(std::move(buffer));
 			break;
 		case BufferType::HEARTBEAT:
 			//OnNotFoundPackRecived(std::move(buffer));
@@ -141,9 +148,8 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 	}
 }
 
-void Service::GetRTT() {
-	// TODO - implement Service::GetRTT
-	throw "Not yet implemented";
+size_t Service::GetRTT() {
+	return recover_manager_->GetRTT();
 }
 
 void Service::OnDataRecived(std::unique_ptr<Buffer> buf) {
@@ -182,7 +188,13 @@ void Service::ConnectService(const std::string IP, const short port) {
 }
  
 void Service::DeConnectService(const std::string IP, const short port) {
+	receiver_->RemoveService(UDPEndPoint{IP,port});
 }
 
-void Service::Request(std::unique_ptr<Package> package, UDPEndPoint endpoint) {
+bool Service::Request(std::unique_ptr<Package> package, UDPEndPoint endpoint) {
+	if (package->GetSize() > Package::GetMaxSizeOfNotSplit()) return false;
+	auto buf = std::make_unique<Buffer> ();
+	buf->SetData(package->GetData(), package->GetSize());
+	receiver_->SendBufferToService(std::move(buf));
+	return true;
 }

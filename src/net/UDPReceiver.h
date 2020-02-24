@@ -31,6 +31,7 @@ namespace Bee {
 		void SendBufferToService(std::unique_ptr<Buffer> buf, const bool allService = false);
 		void SetHeartbeatRate(size_t rate /*ms*/) { heartbeat_rate_ = rate; }
 		void AddService(UDPEndPoint endpoint);
+		void RemoveService(UDPEndPoint endpoint);
 
 	private:
 		void AsyncHeartbeat();

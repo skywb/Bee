@@ -38,15 +38,13 @@ void Connecter::SendPackage(std::unique_ptr<Package> package) {
 	service_->SendPackage(std::move(package));
 }
 
-void Connecter::RequestToServeice(std::unique_ptr<Package> package) {
-	// TODO - implement Connecter::operation
-	throw "Not yet implemented";
+bool Connecter::RequestToServeice(std::unique_ptr<Package> package) {
+	return service_->Request(std::move(package));
 }
 
-void Connecter::RequestToServeice(std::unique_ptr<Package> package,
+bool Connecter::RequestToServeice(std::unique_ptr<Package> package,
 	   	const std::string IP, const short port) {
-	// TODO - implement Connecter::operation
-	throw "Not yet implemented";
+	return service_->Request(std::move(package), UDPEndPoint{IP,port});
 }
 
 void Connecter::SetPackageArrivedCallback(Callback callback) {
@@ -59,9 +57,8 @@ void Connecter::SetHeartRate(const std::size_t ms) {
 	throw "Not yet implemented";
 }
 
-void Connecter::GetRTT() {
-	// TODO - implement Connecter::operation
-	throw "Not yet implemented";
+size_t Connecter::GetRTT() {
+	return service_->GetRTT();
 }
 
 void Connecter::SetTranspond(bool transpond) {
