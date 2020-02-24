@@ -1,18 +1,25 @@
 #include "RecoverManager.h"
+#include "service/mlog.h"
 
 using namespace Bee;
 
 RecoverManager::RecoverManager(boost::asio::io_service& service, Interface* sender) : 
 	service_(service),
 	sender_(sender),
-	timer_pack_outtime_(service) { }
+	timer_NACK_tracer(service),
+	rtt_(50) {
+		size_t cur_rtt = rtt_;
+		timer_NACK_tracer.expires_from_now(boost::posix_time::milliseconds(cur_rtt));
+		timer_NACK_tracer.async_wait(std::bind(&RecoverManager::NackTrackerHandler, this, std::placeholders::_1));
+   	}
 
 RecoverManager::~RecoverManager() {
-	timer_pack_outtime_.cancel();
+	timer_NACK_tracer.cancel();
 }
 
 void RecoverManager::PackageArrived(size_t package_num) {
 	if (is_first_pack_num) {
+		is_first_pack_num = false;
 		min_pack_num_ = package_num;
 		max_pack_num_ = package_num;
 		return;
@@ -30,7 +37,7 @@ void RecoverManager::PackageArrived(size_t package_num) {
 			if (max_pack_it != recover_wait_.crend()) {
 				max_pack = max_pack_it->first;
 			}
-			for (size_t i = max_pack+1; i<package_num; ++i) {
+			for (size_t i = max_pack+1; i<=package_num; ++i) {
 				recover_wait_.emplace(i, std::chrono::system_clock::now());
 			}
 		}
@@ -42,7 +49,9 @@ void RecoverManager::PackageArrived(size_t package_num) {
 			if (it == recover_wait_.end()) {
 				return;
 			} else {
-				//TODO: update rtt
+				auto t = it->second - std::chrono::system_clock::now();
+				//rtt_ = (rtt_ + std::chrono::duration_cast<std::chrono::milliseconds> (t).count());
+				if (rtt_ > 1000) LOG_WARN << "RTT now : " << rtt_;
 				recover_wait_.erase(it);
 				if (recover_wait_.empty()) {
 					oldest_nack_pack_num_ = max_pack_num_;
@@ -90,4 +99,25 @@ std::shared_ptr<Buffer> RecoverManager::GetHistory(size_t pack_num) {
 void RecoverManager::NACKReceived(size_t pack_num, UDPEndPoint endpoint) {
 	auto pack = GetHistory(pack_num);
 	sender_->SendPackageTo(pack, endpoint);
+}
+
+void RecoverManager::NackTrackerHandler(const boost::system::error_code& error) {
+	size_t cur_rtt = rtt_;
+	auto now = std::chrono::system_clock::now();
+	std::lock_guard<std::mutex> lock(mutex_recover_wait_);
+	auto it = recover_wait_.begin();
+	while (it != recover_wait_.end()) {
+		if (it->second + std::chrono::milliseconds(cur_rtt*4) < now) {
+			it = recover_wait_.erase(it);
+			continue;
+		}
+		LOG_INFO << "cur rtt " << cur_rtt;
+		if (it->second + std::chrono::milliseconds(cur_rtt) < now) {
+			LOG_INFO << "should tracer";
+			sender_->SendNack(it->first);
+		}
+	}
+	cur_rtt = rtt_;
+	timer_NACK_tracer.expires_from_now(boost::posix_time::milliseconds(cur_rtt));
+	timer_NACK_tracer.async_wait(std::bind(&RecoverManager::NackTrackerHandler, this, std::placeholders::_1));
 }

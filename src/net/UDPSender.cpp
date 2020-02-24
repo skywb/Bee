@@ -20,7 +20,6 @@ void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf) {
 					if (error) {
 						LOG_ERROR << "Send error : " << error.message();
 					}
-					LOG_INFO << "send end";
 				});
 	}
 }

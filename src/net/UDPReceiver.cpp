@@ -75,3 +75,12 @@ void UDPReceiver::AddService(UDPEndPoint endpoint) {
 	lock.unlock();
 	SendHeartbeat();
 }
+
+void UDPReceiver::RemoveService(UDPEndPoint endpoint) {
+	std::unique_lock<std::mutex> lock(mutex_servies_);
+	auto it = services_.find(endpoint);
+	if (it != services_.end()) {
+		services_.erase(endpoint);
+	}
+	lock.unlock();
+}
