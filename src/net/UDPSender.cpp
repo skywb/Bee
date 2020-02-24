@@ -86,10 +86,3 @@ bool UDPSender::Heartbeat(const UDPEndPoint endpoint) {
 		return true;
 	}
 }
-
-size_t UDPSender::GetPackNumber(size_t count) {
-	std::lock_guard<std::mutex> lock(mutex_pack_number_);
-	auto cur = pack_number_;
-	pack_number_ += count;
-	return cur;
-}

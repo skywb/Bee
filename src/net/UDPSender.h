@@ -25,8 +25,6 @@ namespace Bee {
 		std::map<UDPEndPoint, type_client> endpoints_;
 		std::mutex mutex_endpoints_;
 		boost::asio::ip::udp::socket& socket_;
-		size_t pack_number_;
-		std::mutex mutex_pack_number_;
 
 	public:
 		UDPSender(boost::asio::ip::udp::socket& socket);
@@ -39,7 +37,6 @@ namespace Bee {
 		void AddClient(UDPEndPoint endpoint);
 		void RemoveClient(UDPEndPoint endpoint);
 		bool Heartbeat(const UDPEndPoint endpoint);
-		size_t GetPackNumber(size_t count = 1);
 
 	private:
 		void ClearOutTimeClient();

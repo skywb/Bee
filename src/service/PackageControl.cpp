@@ -4,17 +4,16 @@
 using namespace Bee;
 
 void PackageControl::OnReceivedBuffer(std::unique_ptr<Buffer> buffer) {
-	//if (!OnPackageArrivedCallback_) {
-	//	return ;
-	//}
+	if (!OnPackageArrivedCallback_) {
+		return ;
+	}
 	auto begin_num = buffer->GetBufferHeader().begin;
 	if (buffer->GetBufferHeader().count == 1) {
 		PackageCompleting pack(std::move(buffer));;
 		auto package_complete = pack.GetPackage();
 		if (package_complete) {
 			LOG_INFO << "package complete";
-			//OnPackageArrivedCallback_(std::move(pack.GetPackage()));
-			interface_->OnPackageArrivedCallback(std::move(pack.GetPackage()));
+			OnPackageArrivedCallback_(std::move(pack.GetPackage()));
 		}
 		return;
 	} else {
@@ -29,8 +28,7 @@ void PackageControl::OnReceivedBuffer(std::unique_ptr<Buffer> buffer) {
 				auto package = it->second->GetPackage();
 				if (package) {
 					LOG_INFO << "package complete";
-					//OnPackageArrivedCallback_(std::move(package));
-					interface_->OnPackageArrivedCallback(std::move(package));
+					OnPackageArrivedCallback_(std::move(package));
 				}
 			}
 		}

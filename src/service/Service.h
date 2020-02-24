@@ -9,26 +9,16 @@
 #include <queue>
 
 namespace Bee {
-	class Service :
-	   	public RecoverManager::Interface,
-	   	public PackageControl::PackageInterface {
+	class Service : public RecoverManager::Interface {
 	public:
-
-		typedef std::function<void(std::unique_ptr<Package>)> PackageArrivedCallback;
-
 		//override RecoverManager::Interface
 		void SendNack(const size_t package_num) override;
 		void SendPackageTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint) override;
 
-		//override PackageControl::PackageInterface
-		size_t GetPackNumber(const size_t count = 1) override;
-		void OnPackageArrivedCallback(std::unique_ptr<Package> pack) override;
-
-
-		//static Service& GetService() {
-		//	static Service instance;
-		//	return instance;
-		//}
+		static Service& GetService() {
+			static Service instance;
+			return instance;
+		}
 
 	private:
 		boost::asio::io_service service_;
@@ -39,9 +29,6 @@ namespace Bee {
 		std::unique_ptr<UDPReceiver> receiver_;
 		std::unique_ptr<UDPSender> sender_;
 		std::queue<Package> package_queue_;
-		PackageArrivedCallback callback_;
-
-
 
 	public:
 		Service();
@@ -49,9 +36,8 @@ namespace Bee {
 		void Init();
 
 		void SetThreadCount(int thread_count);
-		void SetPackageArrivedCallback(PackageArrivedCallback callback) {
-			//package_control_->SetPackageArrivedCallback(callback);
-			callback_ = callback;
+		void SetPackageArrivedCallback(PackageControl::PackageArrivedCallback callback) {
+			package_control_->SetPackageArrivedCallback(callback);
 		}
 
 		void SetLocalAddress(const std::string IP, const short port);
