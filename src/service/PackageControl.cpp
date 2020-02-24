@@ -11,26 +11,20 @@ void PackageControl::OnReceivedBuffer(std::unique_ptr<Buffer> buffer) {
 	if (buffer->GetBufferHeader().count == 1) {
 		PackageCompleting pack(std::move(buffer));;
 		auto package_complete = pack.GetPackage();
-		if (package_complete) {
-			LOG_INFO << "package complete";
-			//OnPackageArrivedCallback_(std::move(pack.GetPackage()));
-			interface_->OnPackageArrivedCallback(std::move(pack.GetPackage()));
-		}
+		if (package_complete)
+			OnPackageArrivedCallback_(std::move(pack.GetPackage()));
 		return;
 	} else {
 		auto it = packages_.find(begin_num);
-		if (it == packages_.end()) { // new package
-			auto it = packages_.emplace(buffer->GetBufferHeader().begin, nullptr);
-			auto pack = std::make_unique<PackageCompleting> (std::move(buffer));
-			it.first->second = std::move(pack);
-		} else { // add buffer
+		if (it == packages_.end()) {
+			packages_.emplace(buffer->GetBufferHeader().begin,
+					std::make_unique<PackageCompleting>(std::move(buffer)));
+		} else {
 			bool ok = it->second->AddBuffer(std::move(buffer));
 			if (ok) {
 				auto package = it->second->GetPackage();
 				if (package) {
-					LOG_INFO << "package complete";
-					//OnPackageArrivedCallback_(std::move(package));
-					interface_->OnPackageArrivedCallback(std::move(package));
+					OnPackageArrivedCallback_(std::move(package));
 				}
 			}
 		}

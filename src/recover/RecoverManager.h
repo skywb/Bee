@@ -8,7 +8,6 @@
 #include <memory>
 #include <mutex>
 #include <boost/asio.hpp>
-#include <atomic>
 
 namespace Bee {
 	class RecoverManager {
@@ -26,10 +25,8 @@ namespace Bee {
 		std::mutex mutex_package_history_;
 		std::map<size_t, std::chrono::time_point<std::chrono::system_clock>> recover_wait_;
 		std::mutex mutex_recover_wait_;
-
 		boost::asio::io_service& service_;
-		boost::asio::deadline_timer timer_NACK_tracer;
-		std::atomic<size_t> rtt_;
+		boost::asio::deadline_timer timer_pack_outtime_;
 		Interface* sender_;
 		std::mutex mutex_pack_num_;
 		size_t min_pack_num_ = 0;
@@ -43,13 +40,11 @@ namespace Bee {
 		void PackageArrived(size_t package_num);
 		void AddPackRecord(std::shared_ptr<Buffer> buf);
 		void NACKReceived(size_t pack_num, UDPEndPoint endpoint);
-		size_t GetRTT() { return rtt_; }
 
 	private:
 		void AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer> pack_data);
 		std::shared_ptr<Buffer> GetHistory(size_t pack_num);
 		void ClearOutTimeHistory();
-		void NackTrackerHandler(const boost::system::error_code& error);
 	};
 }
 

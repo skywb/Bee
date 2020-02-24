@@ -6,6 +6,19 @@
 #include <bitset>
 
 namespace Bee {
+	class Package {
+	private:
+		std::size_t size_;
+		std::unique_ptr<uint8_t[]> data_;
+		bool is_complete_package_ = false;
+	public:
+		const uint8_t* GetData();
+
+		void SetData(std::unique_ptr<uint8_t[]> data, size_t size);
+		void SetData(const char* buf, size_t size);
+
+		size_t GetSize();
+	};
 
 #pragma pack(push, 4)
 
@@ -57,22 +70,6 @@ namespace Bee {
 		void SetCount(const size_t count) { header_.count = count; }
 		void SetBufferType(BufferType type) { header_.type = type; }
 		const BufferHeader& GetBufferHeader() { return header_; }
-	};
-
-	class Package {
-	private:
-		std::size_t size_;
-		std::unique_ptr<uint8_t[]> data_;
-		bool is_complete_package_ = false;
-	public:
-		static size_t GetMaxSizeOfNotSplit() { return Buffer::GetMaxSizeOfNotSplit(); }
-
-		const uint8_t* GetData();
-
-		void SetData(std::unique_ptr<uint8_t[]> data, size_t size);
-		void SetData(const char* buf, size_t size);
-
-		size_t GetSize();
 	};
 }
 

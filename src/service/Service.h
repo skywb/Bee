@@ -60,13 +60,13 @@ namespace Bee {
 
 		void SendPackage(std::unique_ptr<Package> package);
 		void ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint);
-		size_t GetRTT();
+		void GetRTT();
 		void SetBufferOutTime(int ms); //ms
 		void AddClient(const std::string IP, const short port);
 		void RemoveClient(const std::string IP, const short port);
 		void ConnectService(const std::string IP, const short port);
 		void DeConnectService(const std::string IP, const short port);
-		bool Request(std::unique_ptr<Package> package, UDPEndPoint endpoint = UDPEndPoint{"0.0.0.0", 0});
+		void Request(std::unique_ptr<Package> package, UDPEndPoint endpoint = UDPEndPoint{"0.0.0.0", 0});
 		//boost::asio::io_service& GetIOService() {
 		//	return service_;
 		//}
