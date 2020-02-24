@@ -29,22 +29,31 @@ namespace Bee {
 	class PackageControl {
 
 	public:
-		typedef std::function<void(std::unique_ptr<Package>)> PackageArrivedCallback;
+		//typedef std::function<void(std::unique_ptr<Package>)> PackageArrivedCallback;
+
+		class PackageInterface
+		{
+		public:
+			virtual size_t GetPackNumber(const size_t count = 1) = 0;
+			virtual void OnPackageArrivedCallback(std::unique_ptr<Package> pack) { }
+		};
 
 	private:
 		std::map<size_t, std::unique_ptr<PackageCompleting>> packages_;
-		PackageArrivedCallback OnPackageArrivedCallback_;
+		//PackageArrivedCallback OnPackageArrivedCallback_;
+		PackageInterface* interface_;
 		size_t current_buffer_number_ = 0;
 
 	public:
-		PackageControl() {
-			OnPackageArrivedCallback_ = [](std::unique_ptr<Package> package){return;};
+		PackageControl(PackageInterface * interface) {
+			interface_ = interface;
+		//	OnPackageArrivedCallback_ = [](std::unique_ptr<Package> package){return;};
 	   	}
 		virtual ~PackageControl() {}
 		void OnReceivedBuffer(std::unique_ptr<Buffer> buffer);
 		void OnBufferNotFound(size_t pack_num);
 		std::vector<std::unique_ptr<Buffer>> SplitPackage(std::unique_ptr<Package> package);
-		void SetPackageArrivedCallback(PackageArrivedCallback callback) { OnPackageArrivedCallback_ = callback; }
+		//void SetPackageArrivedCallback(PackageArrivedCallback callback) { OnPackageArrivedCallback_ = callback; }
 	private:
 
 	};

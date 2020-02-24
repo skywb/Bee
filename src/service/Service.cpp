@@ -17,6 +17,17 @@ void Service::SendNack(const size_t package_num) {
 void Service::SendPackageTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint) {
 	sender_->SendBufferTo(buf, endpoint);
 }
+
+size_t Service::GetPackNumber(const size_t count)  {
+	return  GetPackNumber(count);
+}
+
+void Service::OnPackageArrivedCallback(std::unique_ptr<Package> pack) {
+	if (callback_) {
+		callback_(std::move(pack));
+	}
+}
+
 Service::Service() :
 	socket_(service_) {
 }
@@ -59,7 +70,7 @@ Service::~Service() {
 //}
 
 void Service::Init() {
-	package_control_ = std::make_unique<PackageControl> ();
+	package_control_ = std::make_unique<PackageControl> (this);
 	recover_manager_ = std::make_unique<RecoverManager> (service_, this);
 	receiver_ = std::make_unique<UDPReceiver> (socket_,
 		   	std::bind(&Service::ReceivedHandler, this, std::placeholders::_1, std::placeholders::_2));
