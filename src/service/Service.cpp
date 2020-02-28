@@ -130,7 +130,10 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 			break;
 		case BufferType::HEARTBEAT:
 			//OnNotFoundPackRecived(std::move(buffer));
-			OnHeartBeatReceived(endpoint);
+			OnHeartBeatReceived(std::move(buffer), endpoint);
+			break;
+		case BufferType::SYNC_HEATBEAT:
+			OnSYNCHeartBeatReceived(std::move(buffer), endpoint);
 			break;
 		default:
 			LOG_ERROR << "not found this type";
@@ -154,10 +157,21 @@ void Service::OnNotFoundPackRecived(std::unique_ptr<Buffer> buf) {
 	package_control_->OnBufferNotFound(buf->GetBufferHeader().pack_num);
 }
 
-void Service::OnHeartBeatReceived(const UDPEndPoint endpoint) {
+void Service::OnHeartBeatReceived(std::unique_ptr<Buffer> buf, const UDPEndPoint endpoint) {
 	if (!sender_->Heartbeat(endpoint)) {
 		sender_->AddClient(endpoint);
 	}
+	LOG_DEBUG << sender_->GetHeartRate() << "    " << buf->GetBufferHeader().heartbeat_rate;
+	if (sender_->GetHeartRate() != buf->GetBufferHeader().heartbeat_rate) {
+		auto msg = std::make_unique<Buffer>();
+		msg->SetBufferType(BufferType::SYNC_HEATBEAT);
+		msg->SetHeartRate(sender_->GetHeartRate());
+		sender_->SendBufferTo(std::move(msg), endpoint);
+	}
+}
+
+void Service::OnSYNCHeartBeatReceived(std::unique_ptr<Buffer> buf, const UDPEndPoint endpoint) {
+	receiver_->SetHeartbeatRate(buf->GetBufferHeader().heartbeat_rate);
 }
 
 void Service::SetBufferOutTime(int ms) {

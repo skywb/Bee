@@ -5,9 +5,10 @@
 using namespace Bee;
 
 UDPSender::UDPSender(boost::asio::ip::udp::socket& socket):
-	socket_(socket) {
+	socket_(socket),
+	timer_heartbeat_(socket.get_io_service()) {
 		heart_rate_ = std::chrono::milliseconds(1000);
-}
+ }
 
 UDPSender::~UDPSender() { }
 
@@ -24,7 +25,7 @@ void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf) {
 	}
 }
 
-void UDPSender::SendBufferTo(std::shared_ptr<Buffer> buf, UDPEndPoint endpoint) {
+void UDPSender::SendBufferTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint) {
 	boost::asio::ip::udp::endpoint ep(boost::asio::ip::address::from_string(endpoint.IP), endpoint.port);
 	socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()), ep, 
 			[=](const boost::system::error_code& error, size_t size) {

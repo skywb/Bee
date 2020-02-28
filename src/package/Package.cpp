@@ -25,11 +25,15 @@ size_t Package::GetSize() {
 }
 
 Buffer::Buffer(const uint8_t* buf, size_t size)
-	:data_(nullptr) {
+	: data_(nullptr) {
 		if (size < kBufferHeaderSize_ || size > 1500) return;
-		data_ = new uint8_t[size];
-		memcpy(data_, buf, size);
-		memcpy(&header_, data_, sizeof(header_));
+		if (buf == nullptr)
+			data_ = new uint8_t[kBufferHeaderSize_];
+		else {
+			data_ = new uint8_t[size];
+			memcpy(data_, buf, size);
+			memcpy(&header_, data_, sizeof(header_));
+		}
 }
 
 Buffer::~Buffer() {

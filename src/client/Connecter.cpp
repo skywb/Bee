@@ -53,8 +53,7 @@ void Connecter::SetPackageArrivedCallback(Callback callback) {
 
 // set sender heater
 void Connecter::SetHeartRate(const std::size_t ms) {
-	// TODO - implement Connecter::operation
-	throw "Not yet implemented";
+	service_->SetHeartbeatRate(ms);
 }
 
 size_t Connecter::GetRTT() {

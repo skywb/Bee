@@ -31,6 +31,7 @@ void UDPReceiver::AsyncHeartbeat() {
 
 void UDPReceiver::SendHeartbeat() {
 	std::lock_guard<std::mutex> lock(mutex_servies_);
+	buf_heartbeat_.SetHeartRate(heartbeat_rate_);
 	for (auto i : services_) {
 		socket_.async_send_to(boost::asio::buffer(buf_heartbeat_.GetBufferData(), buf_heartbeat_.GetBufferSize()),
 			   	i.second,

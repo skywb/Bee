@@ -53,6 +53,7 @@ namespace Bee {
 		void ConnectService(const std::string IP, const short port);
 		void DeConnectService(const std::string IP, const short port);
 		bool Request(std::unique_ptr<Package> package, UDPEndPoint endpoint = UDPEndPoint{"0.0.0.0", 0});
+		void SetHeartbeatRate(const size_t rate) { sender_->SetHeartRate(rate); }
 		//boost::asio::io_service& GetIOService() {
 		//	return service_;
 		//}
@@ -62,7 +63,9 @@ namespace Bee {
 		void OnDataRecived(std::unique_ptr<Buffer> buf);
 		void OnNACKRecived(std::unique_ptr<Buffer> buf, UDPEndPoint endpoint);
 		void OnNotFoundPackRecived(std::unique_ptr<Buffer> buf);
-		void OnHeartBeatReceived(const UDPEndPoint endpoint);
+		//void OnHeartBeatReceived(const UDPEndPoint endpoint);
+		void OnHeartBeatReceived(std::unique_ptr<Buffer> buf, const UDPEndPoint endpoint);
+		void OnSYNCHeartBeatReceived(std::unique_ptr<Buffer> buf, const UDPEndPoint endpoint);
 	};
 }
 

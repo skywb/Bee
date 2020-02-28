@@ -13,14 +13,18 @@ namespace Bee {
 		DATA = 1,
 		NACK = 2,
 		BUFFER_NOT_FOUND = 3,
-		HEARTBEAT = 4
+		HEARTBEAT = 4,
+		SYNC_HEATBEAT = 5
 	};
 	struct BufferHeader {
-		size_t pack_num;
+		size_t pack_num = 0;
 		BufferType type;
-		size_t begin;
-		size_t count;
-		size_t size;
+		size_t begin = 0;
+		size_t count = 0;
+		union {
+			size_t size;
+			size_t heartbeat_rate;
+		};
 	};
 #pragma pack(pop)
 
@@ -38,7 +42,7 @@ namespace Bee {
 		static size_t GetMaxSizeOfNotSplit() { return kMaxDataSizeOneBuffer_; }
 		static std::unique_ptr<Buffer> MakeBuffer() { return std::make_unique<Buffer> (); }
 
-		Buffer(const uint8_t* buf = nullptr, size_t size = 0);
+		Buffer(const uint8_t* buf = nullptr, size_t size = kBufferHeaderSize_);
 		~Buffer();
 		//Buffer(std::unique_ptr<uint8_t[]> buf, size_t size);
 		void SetData(const uint8_t* buf, size_t size);
@@ -56,6 +60,7 @@ namespace Bee {
 		void SetBegin(const size_t begin) { header_.begin = begin; }
 		void SetCount(const size_t count) { header_.count = count; }
 		void SetBufferType(BufferType type) { header_.type = type; }
+		void SetHeartRate(const size_t rate) { header_.heartbeat_rate = rate; }
 		const BufferHeader& GetBufferHeader() { return header_; }
 	};
 

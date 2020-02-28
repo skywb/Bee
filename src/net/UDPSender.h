@@ -22,6 +22,7 @@ namespace Bee {
 			bool is_multicast_ = false;
 		};
 		std::chrono::milliseconds heart_rate_;
+		boost::asio::deadline_timer timer_heartbeat_;
 		std::map<UDPEndPoint, type_client> endpoints_;
 		std::mutex mutex_endpoints_;
 		boost::asio::ip::udp::socket& socket_;
@@ -31,9 +32,10 @@ namespace Bee {
 		~UDPSender();
 
 		void SendBuffer(std::shared_ptr<Buffer> buf);
-		void SendBufferTo(std::shared_ptr<Buffer> buf, UDPEndPoint endpoint);
+		void SendBufferTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint);
 
 		void SetHeartRate(unsigned int rate);
+		size_t GetHeartRate() { return heart_rate_.count(); }
 		void AddClient(UDPEndPoint endpoint);
 		void RemoveClient(UDPEndPoint endpoint);
 		bool Heartbeat(const UDPEndPoint endpoint);
