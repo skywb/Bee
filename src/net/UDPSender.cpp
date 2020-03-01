@@ -69,7 +69,7 @@ void UDPSender::ClearOutTimeClient() {
 			++i;
 			continue;
 		} 
-		if (i->second.time_ + heart_rate_ < cur_time) {
+		if (i->second.time_ + heart_rate_*2 < cur_time) {
 			i = endpoints_.erase(i);
 		} else {
 			++i;

@@ -36,6 +36,8 @@ namespace Bee {
 		// set sender Buffer alive time
 		void SetBufferOutTime(int ms); //ms
 		int GetBufferOutTime();
+
+		void SetBufferHistorySize(const size_t size); //ms
 	};
 }
 

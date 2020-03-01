@@ -29,6 +29,7 @@ namespace Bee {
 		std::unique_ptr<UDPReceiver> receiver_;
 		std::unique_ptr<UDPSender> sender_;
 		std::queue<Package> package_queue_;
+		bool transpond_ = false;
 
 	public:
 		Service();
@@ -48,12 +49,14 @@ namespace Bee {
 		void ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint);
 		size_t GetRTT();
 		void SetBufferOutTime(int ms); //ms
+		void SetBufferMaxCount(const size_t size); //ms
 		void AddClient(const std::string IP, const short port);
 		void RemoveClient(const std::string IP, const short port);
 		void ConnectService(const std::string IP, const short port);
 		void DeConnectService(const std::string IP, const short port);
 		bool Request(std::unique_ptr<Package> package, UDPEndPoint endpoint = UDPEndPoint{"0.0.0.0", 0});
 		void SetHeartbeatRate(const size_t rate) { sender_->SetHeartRate(rate); }
+		void SetTranspond(bool transpond);
 		//boost::asio::io_service& GetIOService() {
 		//	return service_;
 		//}

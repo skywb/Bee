@@ -77,12 +77,10 @@ void RecoverManager::AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer
 }
 
 void RecoverManager::ClearOutTimeHistory() {
-	int cnt = 1000 - package_history_.size();
+	int cnt = history_max_len_ - package_history_.size();
 	if (cnt > 0)  {
 		auto end = package_history_.begin();
-		for (int i = 0; i < cnt; ++i) {
-			end++;
-		}
+		std::advance(end, cnt);
 		package_history_.erase(package_history_.begin(), end);
 	}
 }

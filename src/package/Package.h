@@ -14,7 +14,8 @@ namespace Bee {
 		NACK = 2,
 		BUFFER_NOT_FOUND = 3,
 		HEARTBEAT = 4,
-		SYNC_HEATBEAT = 5
+		SYNC_HEATBEAT = 5,
+		REQUEST = 6
 	};
 	struct BufferHeader {
 		size_t pack_num = 0;

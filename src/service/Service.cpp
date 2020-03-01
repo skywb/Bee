@@ -135,6 +135,9 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 		case BufferType::SYNC_HEATBEAT:
 			OnSYNCHeartBeatReceived(std::move(buffer), endpoint);
 			break;
+		case BufferType::REQUEST:
+			LOG_INFO << "REQUEST not implease";
+			break;
 		default:
 			LOG_ERROR << "not found this type";
 	}
@@ -146,6 +149,9 @@ size_t Service::GetRTT() {
 
 void Service::OnDataRecived(std::unique_ptr<Buffer> buf) {
 	recover_manager_->PackageArrived(buf->GetBufferHeader().pack_num);
+	if (transpond_) {
+		sender_->SendBuffer(std::move(buf));
+	}
 	package_control_->OnReceivedBuffer(std::move(buf));
 }
 
@@ -178,6 +184,10 @@ void Service::SetBufferOutTime(int ms) {
 
 }
 
+void Service::SetBufferMaxCount(const size_t size) {
+	recover_manager_->SetHistoryMaxSize(size);
+}
+
 void Service::AddClient(const std::string IP, const short port) {
 	sender_->AddClient(UDPEndPoint{IP,port});
 }
@@ -198,6 +208,7 @@ bool Service::Request(std::unique_ptr<Package> package, UDPEndPoint endpoint) {
 	if (package->GetSize() > Package::GetMaxSizeOfNotSplit()) return false;
 	auto buf = std::make_unique<Buffer> ();
 	buf->SetData(package->GetData(), package->GetSize());
+	buf->SetBufferType(BufferType::REQUEST);
 	receiver_->SendBufferToService(std::move(buf));
 	return true;
 }

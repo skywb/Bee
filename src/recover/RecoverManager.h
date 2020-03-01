@@ -36,6 +36,7 @@ namespace Bee {
 		size_t max_pack_num_ = 0;
 		size_t oldest_nack_pack_num_ = 0;
 		bool is_first_pack_num = true;
+		int history_max_len_ = 10000;
 
 	public:
 		RecoverManager(boost::asio::io_service& service, Interface* sender);
@@ -44,11 +45,12 @@ namespace Bee {
 		void AddPackRecord(std::shared_ptr<Buffer> buf);
 		void NACKReceived(size_t pack_num, UDPEndPoint endpoint);
 		size_t GetRTT() { return rtt_; }
+		void SetHistoryMaxSize(const size_t size) { history_max_len_ = size; }
 
 	private:
 		void AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer> pack_data);
 		std::shared_ptr<Buffer> GetHistory(size_t pack_num);
-		void ClearOutTimeHistory();
+		void learOutTimeHistory();
 		void NackTrackerHandler(const boost::system::error_code& error);
 	};
 }

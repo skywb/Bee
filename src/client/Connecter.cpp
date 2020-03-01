@@ -61,8 +61,7 @@ size_t Connecter::GetRTT() {
 }
 
 void Connecter::SetTranspond(bool transpond) {
-	// TODO - implement Connecter::operation
-	throw "Not yet implemented";
+	service_->SetTranspond(transpond);
 }
 
 void Connecter::SetBufferOutTime(int ms) {
@@ -73,4 +72,9 @@ void Connecter::SetBufferOutTime(int ms) {
 int Connecter::GetBufferOutTime() {
 	// TODO - implement Connecter::operation
 	throw "Not yet implemented";
+}
+
+
+void Connecter::SetBufferHistorySize(const size_t size) {
+	service_->SetBufferMaxCount(size);
 }
