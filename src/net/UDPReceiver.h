@@ -8,6 +8,43 @@
 #include <boost/asio.hpp>
 
 namespace Bee {
+
+	class AsyncReceiver
+	{
+	public:
+		using TypeCallback = std::function<void(std::unique_ptr<Buffer>, UDPEndPoint)>;
+	public:
+		AsyncReceiver (boost::asio::ip::udp::socket& socket, TypeCallback callback) :
+			socket_(socket), 
+			receive_callback_(callback),
+			buf_(nullptr)
+	   	{
+			running_ = false;
+		}
+		virtual ~AsyncReceiver () {
+			running_ = false;
+			if (buf_) {
+			   	delete [] buf_;
+				buf_ = nullptr;
+			}
+		}
+		void Stop () { running_ = false; }
+		void Run () { 
+			if (buf_) delete [] buf_;
+			buf_ = new uint8_t[1500];
+		   	running_ = true;
+			AsyncReceive();
+	   	}
+
+	private:
+		void AsyncReceive ();
+		boost::asio::ip::udp::socket& socket_;
+		bool running_;
+		uint8_t* buf_;
+		boost::asio::ip::udp::endpoint remote_endpoint_;
+		TypeCallback receive_callback_;
+	};
+
 	class UDPReceiver {
 
 	public:
@@ -15,7 +52,7 @@ namespace Bee {
 
 	private:
 		boost::asio::ip::udp::socket& socket_;
-		boost::asio::ip::udp::endpoint remote_endpoint_;
+		std::vector<std::unique_ptr<AsyncReceiver>> receivers_;
 		std::map<UDPEndPoint, boost::asio::ip::udp::endpoint> services_;
 		std::mutex mutex_servies_;
 		boost::asio::deadline_timer timer_heart_;
@@ -34,9 +71,11 @@ namespace Bee {
 		void RemoveService(UDPEndPoint endpoint);
 
 	private:
+		bool IsServiceIP(const UDPEndPoint& ep);
 		void AsyncHeartbeat();
 		void SendHeartbeat();
 	};
+
 }
 
 #endif

@@ -9,3 +9,4 @@
 #include "log/mlog_def.hpp"
 //BEE_LIBARY_API void SetMyLibraryLogCallback(MLogCallBack logCallback);
 void SetMyLibraryLogCallback(MLogCallBack logCallback);
+

@@ -8,32 +8,49 @@ void PackageControl::OnReceivedBuffer(std::unique_ptr<Buffer> buffer) {
 		return ;
 	}
 	auto begin_num = buffer->GetBufferHeader().begin;
-	if (buffer->GetBufferHeader().count == 1) {
-		PackageCompleting pack(std::move(buffer));;
-		auto package_complete = pack.GetPackage();
-		if (package_complete) {
-			LOG_INFO << "package complete";
-			OnPackageArrivedCallback_(std::move(pack.GetPackage()));
-		}
-		return;
+	auto completing = GetCompleting(begin_num);
+	if (completing) {
+		completing->AddBuffer(std::move(buffer));
 	} else {
-		auto it = packages_.find(begin_num);
-		if (it == packages_.end()) { // new package
-			auto it = packages_.emplace(buffer->GetBufferHeader().begin, nullptr);
-			auto pack = std::make_unique<PackageCompleting> (std::move(buffer));
-			it.first->second = std::move(pack);
-		} else { // add buffer
-			bool ok = it->second->AddBuffer(std::move(buffer));
-			if (ok) {
-				auto package = it->second->GetPackage();
-				if (package) {
-					LOG_INFO << "package complete";
-					OnPackageArrivedCallback_(std::move(package));
-				}
-			}
+		completing = EmpleaceCompleting(begin_num);
+		completing->Init(std::move(buffer));
+	}
+	if (completing->Check()) {
+		auto package = completing->GetPackage();
+		if (package) {
+			LOG_INFO << "package complete";
+			OnPackageArrivedCallback_(std::move(package));
 		}
 	}
 }
+
+bool PackageCompleting::Check() {
+	std::lock_guard<std::mutex> lock(mutex_);
+	return cur_count_ >= buf_count_;
+}
+
+
+std::shared_ptr<PackageCompleting> 
+PackageControl::GetCompleting(const size_t beginNumber) {
+	std::lock_guard<std::mutex> lock(mutex_packages_);
+	auto it = packages_.find(beginNumber);
+	if (it == packages_.end()) {
+	   	return nullptr;
+	}
+	else return it->second;
+}
+
+std::shared_ptr<PackageCompleting> 
+PackageControl::EmpleaceCompleting(const size_t beginNumber) {
+	std::lock_guard<std::mutex> lock(mutex_packages_);
+	auto it = packages_.find(beginNumber);
+	if (it == packages_.end()) {
+		packages_.emplace(beginNumber, std::make_shared<PackageCompleting>());
+		it = packages_.find(beginNumber);
+	}
+	return it->second;
+}
+
 
 void PackageControl::OnBufferNotFound(size_t pack_num) {
 	LOG_WARN << "buffer not found";
@@ -64,6 +81,7 @@ std::vector<std::unique_ptr<Buffer>> PackageControl::SplitPackage(std::unique_pt
 		buffer->SetBufferType(BufferType::DATA);
 		buffers.emplace_back(std::move(buffer));
 	}
+	LOG_INFO << "sum of buffers " << buffers.size();
 	return std::move(buffers);
 }
 
@@ -75,20 +93,44 @@ PackageCompleting::PackageCompleting(std::unique_ptr<Buffer> buf) :
 	buf_count_ = buf->GetBufferHeader().count;
 	cur_count_ = 1;
 	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_).swap(buf);
+	is_inited_ = true;
+}
+PackageCompleting::PackageCompleting() {
 }
 
 PackageCompleting::~PackageCompleting() { }
+
+void PackageCompleting::Init(std::unique_ptr<Buffer> buf) {
+	if (!buf)
+		return;
+	std::lock_guard<std::mutex> lock(mutex_);
+	if (is_inited_) {
+		AddBuffer(std::move(buf));
+		return;
+	}
+	buffers_.resize(buf->GetBufferHeader().count);
+	begin_number_ = buf->GetBufferHeader().begin;
+	buf_count_ = buf->GetBufferHeader().count;
+	cur_count_ = 1;
+	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_).swap(buf);
+	is_inited_ = true;
+}
 
 
 bool PackageCompleting::AddBuffer(std::unique_ptr<Buffer> buf) {
 	if (buf->GetBufferHeader().begin != begin_number_) return false;
 	size_t cur = buf->GetBufferHeader().pack_num - begin_number_;
-	if (cur > buf_count_ || buffers_.at(cur)) return false;
+	if (cur > buf_count_) return false;
+	std::unique_lock<std::mutex> lock(mutex_);
+    if (buffers_.at(cur)) return false;
 	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_).swap(buf);
 	++cur_count_;
-	if (cur_count_ >= buf_count_) return true;
-	return false;
+	lock.unlock();
+	LOG_INFO << "current buffers is " << cur_count_ << " sum buffers is " << buf_count_;
+	return true;
 }
+
+
 
 std::unique_ptr<Package> PackageCompleting::GetPackage() {
 	if (cur_count_ < buf_count_) {

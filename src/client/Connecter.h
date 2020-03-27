@@ -8,7 +8,7 @@ namespace Bee {
 
 	private:
 		std::unique_ptr<Bee::Service> service_;
-		std::size_t thread_count_ = 2;
+		std::size_t thread_count_ = 5;
 
 	public:
 		typedef std::function<void(std::unique_ptr<Package>)> Callback;

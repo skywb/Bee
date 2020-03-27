@@ -90,6 +90,7 @@ void Service::SetLocalAddress(const std::string IP, const short port)  {
 	if (error) {
 		LOG_WARN << "bind error : " << error.message();
 	}
+	LOG_INFO << "listen IP: " << IP << " Port: " << port;
 }
 
 void Service::Run() {
@@ -109,19 +110,18 @@ void Service::SendPackage(std::unique_ptr<Package> package) {
 	}
 }
 
-
 void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint) {
 	std::random_device rd;
 	std::uniform_int_distribution<> dis(0,9);
 	switch (buffer->GetBufferHeader().type) {
 		case BufferType::DATA:
-			if (dis(rd) < 2) {
-				break;
-			}
+			//if (dis(rd) < 2) {
+			//	break;
+			//}
 			OnDataRecived(std::move(buffer));
 			break;
 		case BufferType::NACK:
-			LOG_INFO << "NACK";
+			//LOG_INFO << "NACK";
 			OnNACKRecived(std::move(buffer), endpoint);
 			break;
 		case BufferType::BUFFER_NOT_FOUND:
@@ -165,6 +165,7 @@ void Service::OnNotFoundPackRecived(std::unique_ptr<Buffer> buf) {
 
 void Service::OnHeartBeatReceived(std::unique_ptr<Buffer> buf, const UDPEndPoint endpoint) {
 	if (!sender_->Heartbeat(endpoint)) {
+		LOG_INFO << "new client IP: " << endpoint.IP << " Port: " << endpoint.port;
 		sender_->AddClient(endpoint);
 	}
 	LOG_DEBUG << sender_->GetHeartRate() << "    " << buf->GetBufferHeader().heartbeat_rate;
@@ -211,4 +212,8 @@ bool Service::Request(std::unique_ptr<Package> package, UDPEndPoint endpoint) {
 	buf->SetBufferType(BufferType::REQUEST);
 	receiver_->SendBufferToService(std::move(buf));
 	return true;
+}
+
+void Service::SetTranspond(bool transpond) {
+
 }

@@ -37,7 +37,12 @@ namespace Bee {
 		static const size_t kBufferHeaderSize_ = sizeof(BufferHeader);
 		static const size_t kMaxDataSizeOneBuffer_ = 1472 - kBufferHeaderSize_;
 
-		void InitHeader() { memcpy(data_, &header_, sizeof(header_)); }
+		void InitHeader() {
+			if (data_ == nullptr) {
+				data_ = new uint8_t[kBufferHeaderSize_];
+		   	}
+			memcpy(data_, &header_, sizeof(header_));
+		}
 
 	public:
 		static size_t GetMaxSizeOfNotSplit() { return kMaxDataSizeOneBuffer_; }

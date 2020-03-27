@@ -1,6 +1,8 @@
 #include "UDPReceiver.h"
 #include "log/mlog.hpp"
 
+#include <memory>
+
 using namespace Bee;
 
 UDPReceiver::UDPReceiver(boost::asio::ip::udp::socket& socket, TypeCallback callback)
@@ -33,37 +35,39 @@ void UDPReceiver::SendHeartbeat() {
 	std::lock_guard<std::mutex> lock(mutex_servies_);
 	buf_heartbeat_.SetHeartRate(heartbeat_rate_);
 	for (auto i : services_) {
+		//TODO: multicast shoulden't send
 		socket_.async_send_to(boost::asio::buffer(buf_heartbeat_.GetBufferData(), buf_heartbeat_.GetBufferSize()),
 			   	i.second,
 			   	[](const boost::system::error_code& error, std::size_t size){
 					if (error) {
 						LOG_ERROR << error.message();
 					}
+					LOG_INFO << "Send heartbeat " ;
 				});
 	}
-
 }
 
 void UDPReceiver::AsyncReceive() {
-	socket_.async_receive_from(boost::asio::buffer(buf_, 1500), remote_endpoint_, 
-			[&](const boost::system::error_code& error, std::size_t size) {
-				if (error) {
-					LOG_WARN << "receive error : " << error.message();
-					AsyncReceive();
-				}
-				auto buf = std::make_unique<Buffer> (buf_, size);
-				UDPEndPoint endpoint;
-				endpoint.IP = remote_endpoint_.address().to_string();
-				endpoint.port = remote_endpoint_.port();
-				receive_callback_(std::move(buf), endpoint);
-				AsyncReceive();
-			});
+	for (int i = 0; i < 3; ++i) {
+		receivers_.emplace_back(std::make_unique<AsyncReceiver>(socket_, receive_callback_));
+		receivers_[receivers_.size()-1]->Run();
+	}
+}
+
+bool UDPReceiver::IsServiceIP(const UDPEndPoint& ep) {
+	std::lock_guard<std::mutex> lock(mutex_servies_);
+	auto it = services_.find(ep);
+	if (it == services_.end()) return false;
+	return true;
 }
 
 void UDPReceiver::SendBufferToService(std::unique_ptr<Buffer> buf, const bool allService) {
-	socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()),
-		   	remote_endpoint_,
-		   	[](const boost::system::error_code& error, std::size_t size){});
+	for (auto i : services_) {
+		//TODO: multicast shoulden't send
+		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()),
+			   	i.second,
+			   	[](const boost::system::error_code& error, std::size_t size){});
+	}
 }
 
 void UDPReceiver::AddService(UDPEndPoint endpoint) {
@@ -85,3 +89,21 @@ void UDPReceiver::RemoveService(UDPEndPoint endpoint) {
 	}
 	lock.unlock();
 }
+
+void AsyncReceiver::AsyncReceive() {
+	socket_.async_receive_from(boost::asio::buffer(buf_, 1500), remote_endpoint_, 
+			[&](const boost::system::error_code& error, std::size_t size) {
+				if (error) {
+					LOG_WARN << "receive error : " << error.message();
+					AsyncReceive();
+					return ;
+				}
+				UDPEndPoint endpoint;
+				endpoint.IP = remote_endpoint_.address().to_string();
+				endpoint.port = remote_endpoint_.port();
+				auto buf = std::make_unique<Buffer> (buf_, size);
+				receive_callback_(std::move(buf), endpoint);
+				AsyncReceive();
+			});
+}
+

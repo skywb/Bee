@@ -50,7 +50,7 @@ namespace Bee {
 	private:
 		void AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer> pack_data);
 		std::shared_ptr<Buffer> GetHistory(size_t pack_num);
-		void learOutTimeHistory();
+		void ClearOutTimeHistory();
 		void NackTrackerHandler(const boost::system::error_code& error);
 	};
 }
