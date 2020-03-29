@@ -26,6 +26,9 @@ void PackageControl::OnReceivedBuffer(std::unique_ptr<Buffer> buffer) {
 
 bool PackageCompleting::Check() {
 	std::lock_guard<std::mutex> lock(mutex_);
+	if (is_callbacked_) {
+		return false;
+	}
 	return cur_count_ >= buf_count_;
 }
 
@@ -126,16 +129,17 @@ bool PackageCompleting::AddBuffer(std::unique_ptr<Buffer> buf) {
 	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_).swap(buf);
 	++cur_count_;
 	lock.unlock();
-	LOG_INFO << "current buffers is " << cur_count_ << " sum buffers is " << buf_count_;
 	return true;
 }
 
 
 
 std::unique_ptr<Package> PackageCompleting::GetPackage() {
-	if (cur_count_ < buf_count_) {
+	std::lock_guard<std::mutex> lock(mutex_);
+	if (cur_count_ < buf_count_ || is_callbacked_) {
 		return nullptr;
 	}
+	is_callbacked_ = true;
 	size_t size = 0;
 	for (auto& i : buffers_) {
 		size += i->GetDataSize();

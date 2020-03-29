@@ -6,7 +6,7 @@
 using namespace Bee;
 
 void Service::SendNack(const size_t package_num) {
-	LOG_DEBUG << "Send NACK";
+	LOG_DEBUG << "Send NACK " << package_num;
 	auto buf = std::make_unique<Buffer> ();
 	buf->SetPackNum(package_num);
 	buf->SetBufferType(BufferType::NACK);
@@ -86,6 +86,7 @@ void Service::SetLocalAddress(const std::string IP, const short port)  {
 		LOG_WARN << "socket open error : " << error.message();
 	}
 	//socket_.set_option(boost::asio::ip::udp::socket::send_buffer_size(1024*800));
+	socket_.set_option(boost::asio::ip::udp::socket::receive_buffer_size(1024*3000));
 	socket_.bind(local_endpoint, error);
 	if (error) {
 		LOG_WARN << "bind error : " << error.message();
@@ -111,8 +112,8 @@ void Service::SendPackage(std::unique_ptr<Package> package) {
 }
 
 void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint) {
-	std::random_device rd;
-	std::uniform_int_distribution<> dis(0,9);
+	//std::random_device rd;
+	//std::uniform_int_distribution<> dis(0,9);
 	switch (buffer->GetBufferHeader().type) {
 		case BufferType::DATA:
 			//if (dis(rd) < 2) {
@@ -121,7 +122,7 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 			OnDataRecived(std::move(buffer));
 			break;
 		case BufferType::NACK:
-			//LOG_INFO << "NACK";
+			LOG_INFO << "NACK";
 			OnNACKRecived(std::move(buffer), endpoint);
 			break;
 		case BufferType::BUFFER_NOT_FOUND:

@@ -48,7 +48,7 @@ void UDPReceiver::SendHeartbeat() {
 }
 
 void UDPReceiver::AsyncReceive() {
-	for (int i = 0; i < 3; ++i) {
+	for (int i = 0; i < 10; ++i) {
 		receivers_.emplace_back(std::make_unique<AsyncReceiver>(socket_, receive_callback_));
 		receivers_[receivers_.size()-1]->Run();
 	}

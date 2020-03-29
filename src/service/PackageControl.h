@@ -30,6 +30,7 @@ namespace Bee {
 		std::vector<std::unique_ptr<Buffer>> buffers_;
 		std::mutex mutex_;
 		bool is_inited_ = false;
+		bool is_callbacked_ = false;
 	};
 
 	class PackageControl {
