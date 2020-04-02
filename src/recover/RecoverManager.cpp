@@ -1,5 +1,6 @@
 #include "RecoverManager.h"
 #include "service/mlog.h"
+#include <mutex>
 
 using namespace Bee;
 
@@ -19,7 +20,7 @@ RecoverManager::~RecoverManager() {
 	timer_NACK_tracer.cancel();
 }
 
-void RecoverManager::PackageArrived(size_t package_num) {
+bool RecoverManager::PackageArrived(size_t package_num) {
 	//if (is_first_pack_num) {
 	//	is_first_pack_num = false;
 	//	min_pack_num_ = package_num;
@@ -28,10 +29,9 @@ void RecoverManager::PackageArrived(size_t package_num) {
 	//}
 
 	if (package_num < min_pack_num_ && min_pack_num_ + 10000 > min_pack_num_) {
-		return;
+		return false;
 	}
 
-	LOG_INFO << "pack received " << package_num;
 	std::lock_guard<std::mutex> lock(mutex_recover_wait_);
 	if (package_num > max_pack_num_) { //更大的包需要接收
 		for (size_t i = max_pack_num_+1; i<package_num; ++i) {
@@ -41,7 +41,7 @@ void RecoverManager::PackageArrived(size_t package_num) {
 	} else {
 		auto it = recover_wait_.find(package_num);
 		if (it == recover_wait_.end()) {
-			return;
+			return false;
 		} else {
 			recover_wait_.erase(it);
 			if (recover_wait_.empty()) {
@@ -51,6 +51,7 @@ void RecoverManager::PackageArrived(size_t package_num) {
 			}
 		}
 	}
+	return true;
 }
 
 void RecoverManager::AddPackRecord(std::shared_ptr<Buffer> buf) {
@@ -60,7 +61,6 @@ void RecoverManager::AddPackRecord(std::shared_ptr<Buffer> buf) {
 
 void RecoverManager::AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer> pack_data) {
 	std::lock_guard<std::mutex> lock(mutex_package_history_);
-	LOG_INFO << package_history_.size();
 	if (package_history_.find(package_num) == package_history_.end()) {
 		auto result = package_history_.emplace(std::make_pair(package_num, pack_data));
 		if (!result.second) {
@@ -105,6 +105,9 @@ void RecoverManager::NackTrackerHandler(const boost::system::error_code& error) 
 	while (it != recover_wait_.end()) {
 		if (it->second + std::chrono::milliseconds(cur_rtt*4) < now) {
 			it = recover_wait_.erase(it);
+			/*! TODO: 处理超时的包
+			*  \todo 处理超时的包
+			*/
 		} else if (it->second + std::chrono::milliseconds(cur_rtt) < now) {
 			nacks.push_back(it->first);
 			//sender_->SendNack(it->first);
@@ -118,7 +121,18 @@ void RecoverManager::NackTrackerHandler(const boost::system::error_code& error) 
 	for (auto i : nacks) {
 		sender_->SendNack(i);
 	}
-	if (cur_rtt < 200) LOG_INFO << cur_rtt;
 	timer_NACK_tracer.expires_from_now(boost::posix_time::milliseconds(cur_rtt));
 	timer_NACK_tracer.async_wait(std::bind(&RecoverManager::NackTrackerHandler, this, std::placeholders::_1));
+}
+
+bool RecoverManager::WaitPackage(const size_t min_packnum, const size_t max_packnum) {
+	std::lock_guard<std::mutex> lock(mutex_recover_wait_);
+	if (min_packnum < min_pack_num_) return false;
+	if (max_packnum > max_pack_num_) {
+		for (size_t i = max_pack_num_+1; i<=max_packnum; ++i) {
+			recover_wait_.emplace(i, std::chrono::system_clock::now());
+		}
+		max_pack_num_ = max_packnum;
+	}
+	return true;
 }

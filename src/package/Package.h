@@ -71,19 +71,29 @@ namespace Bee {
 	};
 
 	class Package {
+	public:
+		enum Stat {
+			COMPLETING	= 1,
+			COMPLETED	= 2,
+			OUTTIME		= 3
+		};
 	private:
 		std::size_t size_;
 		std::unique_ptr<uint8_t[]> data_;
-		bool is_complete_package_ = false;
+		Stat stat_ = COMPLETING;
 	public:
 		static size_t GetMaxSizeOfNotSplit() { return Buffer::GetMaxSizeOfNotSplit(); }
-
 		const uint8_t* GetData();
-
+		Package() {}
+		~Package() {}
 		void SetData(std::unique_ptr<uint8_t[]> data, size_t size);
 		void SetData(const char* buf, size_t size);
-
 		size_t GetSize();
+		operator bool() {
+			return stat_ == COMPLETED;
+		}
+		Stat GetStat() { return stat_; }
+		void SetOutTime() { stat_ = OUTTIME; }
 	};
 }
 

@@ -3,20 +3,20 @@
 
 using namespace Bee;
 
-void PackageControl::OnReceivedBuffer(std::unique_ptr<Buffer> buffer) {
+void PackageControl::OnReceivedBuffer(std::shared_ptr<Buffer> buffer) {
 	if (!OnPackageArrivedCallback_) {
 		return ;
 	}
 	auto begin_num = buffer->GetBufferHeader().begin;
 	auto completing = GetCompleting(begin_num);
 	if (completing) {
-		completing->AddBuffer(std::move(buffer));
+		completing->AddBuffer(buffer);
 	} else {
-		completing = EmpleaceCompleting(begin_num);
-		completing->Init(std::move(buffer));
+		completing = EmpleaceCompleting(std::move(buffer));
 	}
 	if (completing->Check()) {
-		auto package = completing->GetPackage();
+		LOG_INFO << "complete";
+		auto package = std::move(completing->GetPackage());
 		if (package) {
 			LOG_INFO << "package complete";
 			OnPackageArrivedCallback_(std::move(package));
@@ -44,19 +44,82 @@ PackageControl::GetCompleting(const size_t beginNumber) {
 }
 
 std::shared_ptr<PackageCompleting> 
-PackageControl::EmpleaceCompleting(const size_t beginNumber) {
+PackageControl::EmpleaceCompleting(std::shared_ptr<Buffer> buf) {
 	std::lock_guard<std::mutex> lock(mutex_packages_);
-	auto it = packages_.find(beginNumber);
+	size_t begin_number = buf->GetBufferHeader().begin;
+	auto it = packages_.find(begin_number);
 	if (it == packages_.end()) {
-		packages_.emplace(beginNumber, std::make_shared<PackageCompleting>());
-		it = packages_.find(beginNumber);
+		packages_.emplace(begin_number, std::make_shared<PackageCompleting>());
+		it = packages_.find(begin_number);
+		it->second->Init(buf);
 	}
 	return it->second;
 }
 
 
 void PackageControl::OnBufferNotFound(size_t pack_num) {
-	LOG_WARN << "buffer not found";
+	std::lock_guard<std::mutex> lock(mutex_packages_);
+	for (auto it = packages_.begin(); it != packages_.end(); ++it) {
+		if (it->first > pack_num) return;
+		if (it->second->GetMaxPackageNumber() < pack_num) {
+			auto package = it->second->OutTime();
+			if (package) {
+				OnPackageArrivedCallback_(std::move(package));
+			}
+		}
+	}
+}
+
+std::unique_ptr<Package> PackageCompleting::GetPackage() {
+	std::lock_guard<std::mutex> lock(mutex_);
+	if (cur_count_ < buf_count_ || is_callbacked_) {
+		LOG_DEBUG << "current buffer count is " << cur_count_ << " sum is " << buf_count_;
+		return nullptr;
+	}
+	is_callbacked_ = true;
+	size_t size = 0;
+	for (auto& i : buffers_) {
+		size += i->GetDataSize();
+	}
+	auto package = std::make_unique<Package>();
+	auto data = std::make_unique<uint8_t[]> (size);
+	auto* buf = data.get();
+
+	for (auto& i : buffers_) {
+		memcpy(buf, i->GetData(), i->GetDataSize());
+		buf += i->GetDataSize();
+		i.reset();
+	}
+
+	package->SetData(std::move(data), size);
+	return std::move(package);
+}
+
+std::unique_ptr<Package> PackageCompleting::OutTime() {
+	std::lock_guard<std::mutex> lock(mutex_);
+	if (is_callbacked_) {
+		LOG_DEBUG << "current buffer count is " << cur_count_ << " sum is " << buf_count_;
+		return nullptr;
+	}
+	is_callbacked_ = true;
+	size_t size = 0;
+	for (auto& i : buffers_) {
+		size += i->GetDataSize();
+	}
+	auto package = std::make_unique<Package>();
+	auto data = std::make_unique<uint8_t[]> (size);
+	auto* buf = data.get();
+
+	for (auto& i : buffers_) {
+		if (i)
+			memcpy(buf, i->GetData(), i->GetDataSize());
+		buf += i->GetDataSize();
+		if (i)
+			i.reset();
+	}
+	package->SetData(std::move(data), size);
+	package->SetOutTime();
+	return std::move(package);
 }
 
 std::vector<std::unique_ptr<Buffer>> PackageControl::SplitPackage(std::unique_ptr<Package> package) {
@@ -88,45 +151,46 @@ std::vector<std::unique_ptr<Buffer>> PackageControl::SplitPackage(std::unique_pt
 	return std::move(buffers);
 }
 
-PackageCompleting::PackageCompleting(std::unique_ptr<Buffer> buf) :
+PackageCompleting::PackageCompleting(std::shared_ptr<Buffer> buf) :
 	buffers_(buf->GetBufferHeader().count){
 	if (!buf)
 		return;
 	begin_number_ = buf->GetBufferHeader().begin;
 	buf_count_ = buf->GetBufferHeader().count;
 	cur_count_ = 1;
-	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_).swap(buf);
+	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_) = buf;
 	is_inited_ = true;
 }
+
 PackageCompleting::PackageCompleting() {
 }
 
 PackageCompleting::~PackageCompleting() { }
 
-void PackageCompleting::Init(std::unique_ptr<Buffer> buf) {
+void PackageCompleting::Init(std::shared_ptr<Buffer> buf) {
 	if (!buf)
 		return;
 	std::lock_guard<std::mutex> lock(mutex_);
 	if (is_inited_) {
-		AddBuffer(std::move(buf));
+		AddBuffer(buf);
 		return;
 	}
 	buffers_.resize(buf->GetBufferHeader().count);
 	begin_number_ = buf->GetBufferHeader().begin;
 	buf_count_ = buf->GetBufferHeader().count;
 	cur_count_ = 1;
-	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_).swap(buf);
+	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_) = buf;
 	is_inited_ = true;
 }
 
 
-bool PackageCompleting::AddBuffer(std::unique_ptr<Buffer> buf) {
+bool PackageCompleting::AddBuffer(std::shared_ptr<Buffer> buf) {
 	if (buf->GetBufferHeader().begin != begin_number_) return false;
 	size_t cur = buf->GetBufferHeader().pack_num - begin_number_;
-	if (cur > buf_count_) return false;
+	if (cur >= buf_count_) return false;
 	std::unique_lock<std::mutex> lock(mutex_);
     if (buffers_.at(cur)) return false;
-	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_).swap(buf);
+	buffers_.at(buf->GetBufferHeader().pack_num - begin_number_) = buf;
 	++cur_count_;
 	lock.unlock();
 	return true;
@@ -134,26 +198,28 @@ bool PackageCompleting::AddBuffer(std::unique_ptr<Buffer> buf) {
 
 
 
-std::unique_ptr<Package> PackageCompleting::GetPackage() {
-	std::lock_guard<std::mutex> lock(mutex_);
-	if (cur_count_ < buf_count_ || is_callbacked_) {
-		return nullptr;
+size_t PackageControl::GetWaittingBufferNumber(const size_t max) {
+	std::lock_guard<std::mutex> lock(mutex_packages_);
+	if (packages_.empty()) {
+		return max;
 	}
-	is_callbacked_ = true;
-	size_t size = 0;
-	for (auto& i : buffers_) {
-		size += i->GetDataSize();
-	}
-	auto package = std::make_unique<Package>();
-	auto data = std::make_unique<uint8_t[]> (size);
-	auto* buf = data.get();
-
-	for (auto& i : buffers_) {
-		memcpy(buf, i->GetData(), i->GetDataSize());
-		buf += i->GetDataSize();
-	}
-
-	package->SetData(std::move(data), size);
-	return std::move(package);
+	return  packages_.crbegin()->second->GetMaxPackageNumber();
 }
 
+void PackageControl::ClearOutTimePackage(const size_t min) {
+	std::vector<std::unique_ptr<Package>> outtime_packages;
+	std::unique_lock<std::mutex> lock(mutex_packages_);
+	for (auto it = packages_.begin(); it != packages_.end(); ) {
+		if (it->second->GetMaxPackageNumber() < min) {
+			auto package = std::move(it->second->OutTime());
+			outtime_packages.push_back(std::move(package));
+			it = packages_.erase(it);
+		} else {
+			++it;
+		}
+	}
+	lock.unlock();
+	for (auto& i : outtime_packages) {
+		OnPackageArrivedCallback_(std::move(i));
+	}
+}

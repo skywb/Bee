@@ -30,6 +30,12 @@ namespace Bee {
 		std::unique_ptr<UDPSender> sender_;
 		std::queue<Package> package_queue_;
 		bool transpond_ = false;
+		// unprocessed buffer
+		std::queue<std::unique_ptr<Buffer>> buffer_que_;
+		std::mutex mutex_buffer_que_;
+
+		int using_process_thread_cnt_ = 0;
+		std::mutex mutex_using_process_thread_cnt_;
 
 	public:
 		Service();
@@ -69,6 +75,9 @@ namespace Bee {
 		//void OnHeartBeatReceived(const UDPEndPoint endpoint);
 		void OnHeartBeatReceived(std::unique_ptr<Buffer> buf, const UDPEndPoint endpoint);
 		void OnSYNCHeartBeatReceived(std::unique_ptr<Buffer> buf, const UDPEndPoint endpoint);
+		void AddBufferToQue(std::unique_ptr<Buffer> buf);
+		std::unique_ptr<Buffer> GetBufferFromQue();
+		void AsyncProcessBuffers();
 	};
 }
 

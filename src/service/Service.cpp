@@ -1,5 +1,6 @@
 #include "Service.h"
 #include "service/mlog.h"
+#include <mutex>
 
 #include <random>
 
@@ -18,7 +19,8 @@ void Service::SendPackageTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpo
 	sender_->SendBufferTo(buf, endpoint);
 }
 Service::Service() :
-	socket_(service_) {
+	socket_(service_), 
+	using_process_thread_cnt_(0) {
 }
 
 Service::~Service() {
@@ -30,33 +32,6 @@ Service::~Service() {
 		}
 	}
 }
-
-//// Only for Unittest
-//Service::Service(bool is_unittest, std::unique_ptr<PackageControl> package_control, 
-//		std::unique_ptr<RecoverManager> recover_manager,
-//		std::unique_ptr<UDPReceiver> receiver,
-//		std::unique_ptr<UDPSender> sender) : socket_(service_) {
-//	assert(is_unittest);
-//	if (package_control)
-//		package_control_ = std::move(package_control);
-//	else 
-//		package_control_ = std::make_unique<PackageControl> ();
-//	if (recover_manager)
-//		recover_manager_ = std::move(recover_manager);
-//	else 
-//		recover_manager_ = std::make_unique<RecoverManager> (service_, [&](std::shared_ptr<Buffer> buf, UDPEndPoint endpoint) {
-//				sender_->SendBufferTo(buf, endpoint);
-//				});
-//	if (receiver)
-//		receiver_ = std::move(receiver);
-//	else 
-//		receiver_ = std::make_unique<UDPReceiver> (socket_,
-//				std::bind(&Service::ReceivedHandler, this, std::placeholders::_1, std::placeholders::_2));
-//	if (sender)
-//		sender_ = std::move(sender);
-//	else 
-//		sender_ = std::make_unique<UDPSender> (socket_);
-//}
 
 void Service::Init() {
 	package_control_ = std::make_unique<PackageControl> ();
@@ -86,7 +61,7 @@ void Service::SetLocalAddress(const std::string IP, const short port)  {
 		LOG_WARN << "socket open error : " << error.message();
 	}
 	//socket_.set_option(boost::asio::ip::udp::socket::send_buffer_size(1024*800));
-	socket_.set_option(boost::asio::ip::udp::socket::receive_buffer_size(1024*3000));
+	socket_.set_option(boost::asio::ip::udp::socket::receive_buffer_size(1024*2000));
 	socket_.bind(local_endpoint, error);
 	if (error) {
 		LOG_WARN << "bind error : " << error.message();
@@ -149,11 +124,56 @@ size_t Service::GetRTT() {
 }
 
 void Service::OnDataRecived(std::unique_ptr<Buffer> buf) {
-	recover_manager_->PackageArrived(buf->GetBufferHeader().pack_num);
-	if (transpond_) {
-		sender_->SendBuffer(std::move(buf));
+	bool is_effective_buffer = recover_manager_->PackageArrived(buf->GetBufferHeader().pack_num);
+	if (is_effective_buffer) {
+		AddBufferToQue(std::move(buf));
 	}
-	package_control_->OnReceivedBuffer(std::move(buf));
+}
+
+void Service::AddBufferToQue(std::unique_ptr<Buffer> buf) {
+	std::unique_lock<std::mutex> lock(mutex_buffer_que_);
+	buffer_que_.push(std::move(buf));
+	lock.unlock();
+	AsyncProcessBuffers();
+}
+
+void Service::AsyncProcessBuffers() {
+	std::unique_lock<std::mutex> lock(mutex_using_process_thread_cnt_);
+	if (using_process_thread_cnt_ != 0 && using_process_thread_cnt_ < threads_.size() - 2)  {
+		return;
+	} else {
+		using_process_thread_cnt_++;
+	}
+	lock.unlock();
+	while (true) {
+		std::unique_ptr<Buffer> buf = std::move(GetBufferFromQue());
+		if (!buf) { 
+			break;
+		}
+		std::shared_ptr<Buffer> buf_shared = std::move(buf);
+		if (transpond_) {
+			sender_->SendBuffer(buf_shared);
+		}
+		if (buf_shared->GetBufferHeader().begin == buf_shared->GetBufferHeader().pack_num) {
+			recover_manager_->WaitPackage(buf_shared->GetBufferHeader().begin, 
+					buf_shared->GetBufferHeader().begin+buf_shared->GetBufferHeader().count-1);
+		}
+		package_control_->OnReceivedBuffer(buf_shared);
+	}
+	lock.lock();	
+	using_process_thread_cnt_--;
+	lock.unlock();
+}
+
+std::unique_ptr<Buffer> Service::GetBufferFromQue() {
+	std::unique_lock<std::mutex> lock(mutex_buffer_que_);
+	if (buffer_que_.empty()) {
+		return nullptr;
+	}
+	auto p = std::move(buffer_que_.front());
+	buffer_que_.pop();
+	lock.unlock();
+	return std::move(p);
 }
 
 void Service::OnNACKRecived(std::unique_ptr<Buffer> buf, UDPEndPoint endpoint) {
@@ -218,3 +238,5 @@ bool Service::Request(std::unique_ptr<Package> package, UDPEndPoint endpoint) {
 void Service::SetTranspond(bool transpond) {
 
 }
+
+

@@ -31,7 +31,6 @@ namespace Bee {
 		boost::asio::deadline_timer timer_NACK_tracer;
 		std::atomic<size_t> rtt_;
 		Interface* sender_;
-		std::mutex mutex_pack_num_;
 		size_t min_pack_num_ = 0;
 		size_t max_pack_num_ = 0;
 		size_t oldest_nack_pack_num_ = 0;
@@ -41,11 +40,12 @@ namespace Bee {
 	public:
 		RecoverManager(boost::asio::io_service& service, Interface* sender);
 		virtual ~RecoverManager();
-		void PackageArrived(size_t package_num);
+		bool PackageArrived(size_t package_num);
 		void AddPackRecord(std::shared_ptr<Buffer> buf);
 		void NACKReceived(size_t pack_num, UDPEndPoint endpoint);
 		size_t GetRTT() { return rtt_; }
 		void SetHistoryMaxSize(const size_t size) { history_max_len_ = size; }
+		bool WaitPackage(const size_t min_packnum, const size_t max_packnum);
 
 	private:
 		void AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer> pack_data);
