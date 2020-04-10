@@ -16,6 +16,7 @@ namespace Bee {
 			type_client(UDPEndPoint endpoint) : 
 				endpoint_(boost::asio::ip::address::from_string(endpoint.IP), endpoint.port) {
 					time_ = std::chrono::system_clock::now();
+					is_multicast_ = endpoint_.address().is_multicast();
 			}
 			boost::asio::ip::udp::endpoint endpoint_;
 			std::chrono::time_point<std::chrono::system_clock> time_;

@@ -70,10 +70,12 @@ void PackageControl::OnBufferNotFound(size_t pack_num) {
 	}
 }
 
-std::unique_ptr<Package> PackageCompleting::GetPackage() {
+std::unique_ptr<Package> 
+PackageCompleting::GetPackage() {
 	std::lock_guard<std::mutex> lock(mutex_);
 	if (cur_count_ < buf_count_ || is_callbacked_) {
-		LOG_DEBUG << "current buffer count is " << cur_count_ << " sum is " << buf_count_;
+		LOG_DEBUG << "current buffer count is " << cur_count_ 
+			<< " sum is " << buf_count_;
 		return nullptr;
 	}
 	is_callbacked_ = true;
@@ -84,13 +86,11 @@ std::unique_ptr<Package> PackageCompleting::GetPackage() {
 	auto package = std::make_unique<Package>();
 	auto data = std::make_unique<uint8_t[]> (size);
 	auto* buf = data.get();
-
 	for (auto& i : buffers_) {
 		memcpy(buf, i->GetData(), i->GetDataSize());
 		buf += i->GetDataSize();
 		i.reset();
 	}
-
 	package->SetData(std::move(data), size);
 	return std::move(package);
 }
@@ -122,7 +122,8 @@ std::unique_ptr<Package> PackageCompleting::OutTime() {
 	return std::move(package);
 }
 
-std::vector<std::unique_ptr<Buffer>> PackageControl::SplitPackage(std::unique_ptr<Package> package) {
+std::vector<std::unique_ptr<Buffer>> 
+PackageControl::SplitPackage(std::unique_ptr<Package> package) {
 	std::vector<std::unique_ptr<Buffer>> buffers;
 	auto buf = package->GetData();
 	size_t size = package->GetSize();

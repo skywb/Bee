@@ -35,7 +35,6 @@ void UDPReceiver::SendHeartbeat() {
 	std::lock_guard<std::mutex> lock(mutex_servies_);
 	buf_heartbeat_.SetHeartRate(heartbeat_rate_);
 	for (auto i : services_) {
-		//TODO: multicast shoulden't send
 		socket_.async_send_to(boost::asio::buffer(buf_heartbeat_.GetBufferData(), buf_heartbeat_.GetBufferSize()),
 			   	i.second,
 			   	[](const boost::system::error_code& error, std::size_t size){
@@ -49,8 +48,14 @@ void UDPReceiver::SendHeartbeat() {
 
 void UDPReceiver::AsyncReceive() {
 	for (int i = 0; i < 10; ++i) {
-		receivers_.emplace_back(std::make_unique<AsyncReceiver>(socket_, receive_callback_));
+		receivers_.emplace_back(std::make_unique<AsyncReceiver>(socket_,
+				   	[&](std::unique_ptr<Buffer> buf, UDPEndPoint endpoint){
+			receive_callback_(std::move(buf), endpoint);
+		}));
 		receivers_[receivers_.size()-1]->Run();
+	}
+	for (auto& i : multicast_services_) {
+		i.Run();
 	}
 }
 
@@ -62,32 +67,59 @@ bool UDPReceiver::IsServiceIP(const UDPEndPoint& ep) {
 }
 
 void UDPReceiver::SendBufferToService(std::unique_ptr<Buffer> buf, const bool allService) {
+	std::unique_lock<std::mutex> lock(mutex_servies_);
 	for (auto i : services_) {
-		//TODO: multicast shoulden't send
 		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()),
 			   	i.second,
 			   	[](const boost::system::error_code& error, std::size_t size){});
 	}
+	lock.unlock();
+//	std::unique_lock<std::mutex> lock_mulcast(mutex_multicast_servies_);
+//	for (auto i : multicast_services_) {
+//		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()),
+//			   	i.second,
+//			   	[](const boost::system::error_code& error, std::size_t size){});
+//	}
+//	lock_mulcast.unlock();
 }
 
 void UDPReceiver::AddService(UDPEndPoint endpoint) {
-	std::unique_lock<std::mutex> lock(mutex_servies_);
-	auto it = services_.find(endpoint);
-	if (it == services_.end()) {
-		services_.emplace(endpoint, boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(endpoint.IP), endpoint.port));
-		LOG_INFO << "Add a service : " << endpoint.IP << ":" << endpoint.port << " current service count is " << services_.size();
+	auto addr = boost::asio::ip::address::from_string(endpoint.IP);
+	if (addr.is_multicast()) {
+		multicast_services_.emplace_back(
+				socket_.get_io_service(), endpoint, receive_callback_);
+		auto it = multicast_services_.rbegin();
+		it->Run();
+		LOG_INFO << "listen mulcast ip : " << endpoint.IP;
+	} else {
+		std::unique_lock<std::mutex> lock(mutex_servies_);
+		auto it = services_.find(endpoint);
+		if (it == services_.end()) {
+			services_.emplace(endpoint, boost::asio::ip::udp::endpoint(
+						boost::asio::ip::address::from_string(endpoint.IP), endpoint.port));
+			LOG_INFO << "Add a service : " << endpoint.IP << ":"
+			   	<< endpoint.port << " current service count is " << services_.size();
+		}
+		lock.unlock();
+		SendHeartbeat();
 	}
-	lock.unlock();
-	SendHeartbeat();
 }
 
 void UDPReceiver::RemoveService(UDPEndPoint endpoint) {
-	std::unique_lock<std::mutex> lock(mutex_servies_);
-	auto it = services_.find(endpoint);
-	if (it != services_.end()) {
-		services_.erase(endpoint);
+	auto addr = boost::asio::ip::address::from_string(endpoint.IP);
+	if (addr.is_multicast()) {
+		//TODO::
+		//socket_.set_option(boost::asio::ip::multicast::leave_group(addr));
+		//std::lock_guard<std::mutex> lock(mutex_multicast_servies_);
+		//multicast_services_.clear();
+	} else {
+		std::unique_lock<std::mutex> lock(mutex_servies_);
+		auto it = services_.find(endpoint);
+		if (it != services_.end()) {
+			services_.erase(endpoint);
+		}
+		lock.unlock();
 	}
-	lock.unlock();
 }
 
 void AsyncReceiver::AsyncReceive() {
@@ -101,6 +133,56 @@ void AsyncReceiver::AsyncReceive() {
 				UDPEndPoint endpoint;
 				endpoint.IP = remote_endpoint_.address().to_string();
 				endpoint.port = remote_endpoint_.port();
+				auto buf = std::make_unique<Buffer> (buf_, size);
+				receive_callback_(std::move(buf), endpoint);
+				AsyncReceive();
+			});
+}
+
+MulcastReceiver::MulcastReceiver (boost::asio::io_service& service,
+	   	const UDPEndPoint endpoint, TypeCallback callback) :
+#if LINUX
+	socket_(service, boost::asio::ip::udp::endpoint(
+				boost::asio::ip::address::from_string("0.0.0.0"), endpoint.port))
+#elif WIN
+	socket_(service, boost::asio::ip::udp::endpoint(
+				boost::asio::ip::address::from_string(endpoint.IP), endpoint.port))
+#else
+	socket_(service, boost::asio::ip::udp::endpoint(
+				boost::asio::ip::address::from_string("0.0.0.0"), endpoint.port))
+#endif
+	,multicast_ip_(endpoint.IP),
+	multicast_port_(endpoint.port),
+	buf_(nullptr), receive_callback_(callback)
+{
+	socket_.set_option(boost::asio::ip::multicast::join_group(
+				boost::asio::ip::address::from_string(multicast_ip_)));
+}
+
+MulcastReceiver::~MulcastReceiver () {
+	socket_.set_option(boost::asio::ip::multicast::leave_group(
+				boost::asio::ip::address::from_string(multicast_ip_)));
+	if (socket_.is_open())
+		socket_.close();
+}
+
+void MulcastReceiver::Run() {
+	if (buf_) delete [] buf_;
+	buf_ = new uint8_t[1500];
+	AsyncReceive();
+}
+
+void MulcastReceiver::AsyncReceive() {
+	socket_.async_receive_from(boost::asio::buffer(buf_, 1500), src_endpoint_, 
+			[&](const boost::system::error_code& error, std::size_t size) {
+				if (error) {
+					LOG_WARN << "receive error : " << error.message();
+					AsyncReceive();
+					return ;
+				}
+				UDPEndPoint endpoint;
+				endpoint.IP = src_endpoint_.address().to_string();
+				endpoint.port = src_endpoint_.port();
 				auto buf = std::make_unique<Buffer> (buf_, size);
 				receive_callback_(std::move(buf), endpoint);
 				AsyncReceive();

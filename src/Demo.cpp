@@ -16,8 +16,11 @@
 
 const std::string MULTYCAST_IP = "224.0.0.1";
 const short MULTYCAST_PORT = 8999;
-//const std::string LOCAL_IP = "172.31.171.169";
+#ifdef WIN
 const std::string LOCAL_IP = "192.168.1.105";
+#elif LINUX or UNIX
+const std::string LOCAL_IP = "172.20.119.100";
+#endif
 const std::string UNICAST_IP = LOCAL_IP;
 const short UNICAST_PORT = 8888;
 
@@ -58,14 +61,16 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	log_stream.open("log.txt");
+#if LINUX
 	system("pwd");
+#endif
 
 	SetMyLibraryLogCallback(LogCallback);
 	Bee::Connecter connecter;
 	if (memcmp(argv[1], "receiver", 6) == 0) {
-		connecter.SetLocalIPAndPort(LOCAL_IP, 5888);
-		//connecter.AddService(MULTYCAST_IP, MULTYCAST_PORT);
-		connecter.AddService(UNICAST_IP, UNICAST_PORT);
+		connecter.SetLocalIPAndPort(LOCAL_IP, 6999);
+		connecter.AddService(MULTYCAST_IP, MULTYCAST_PORT);
+		//connecter.AddService(UNICAST_IP, UNICAST_PORT);
 		connecter.SetPackageArrivedCallback([](std::unique_ptr<Bee::Package> package){
 				FileINFO file;
 				auto buf = package->GetData();
@@ -94,8 +99,10 @@ int main(int argc, char *argv[]) {
 		pause();
 #endif
 	} else if (memcmp(argv[1], "sender", 6) == 0) {
-		connecter.SetLocalIPAndPort(LOCAL_IP, UNICAST_PORT);
+		//connecter.SetLocalIPAndPort(LOCAL_IP, UNICAST_PORT);
+		connecter.SetLocalIPAndPort("0.0.0.0", UNICAST_PORT);
 		connecter.AddClient(MULTYCAST_IP, MULTYCAST_PORT);
+		//connecter.AddClient(LOCAL_IP, 3888);
 		//connecter.AddClient(UNICAST_IP, UNICAST_PORT);
 		std::string msg;
 		std::cout << "please input file path: ";

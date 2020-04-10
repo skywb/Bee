@@ -4,10 +4,30 @@
 #include "package/Package.h"	
 #include "net/UDPEndPoint.h"
 #include <memory>
+#include <list>
 #include <functional>
 #include <boost/asio.hpp>
 
 namespace Bee {
+
+	class MulcastReceiver
+	{
+	public:
+		using TypeCallback = std::function<void(std::unique_ptr<Buffer>, UDPEndPoint)>;
+	public:
+		MulcastReceiver (boost::asio::io_service& service, const UDPEndPoint endpoint, TypeCallback callback);
+		virtual ~MulcastReceiver ();
+		void Run();
+		void Stop();
+	private:
+		void AsyncReceive ();
+		boost::asio::ip::udp::socket socket_;
+		const std::string multicast_ip_;
+		const short multicast_port_;
+		boost::asio::ip::udp::endpoint src_endpoint_;
+		uint8_t* buf_;
+		TypeCallback receive_callback_;
+	};
 
 	class AsyncReceiver
 	{
@@ -17,8 +37,7 @@ namespace Bee {
 		AsyncReceiver (boost::asio::ip::udp::socket& socket, TypeCallback callback) :
 			socket_(socket), 
 			receive_callback_(callback),
-			buf_(nullptr)
-	   	{
+			buf_(nullptr) {
 			running_ = false;
 		}
 		virtual ~AsyncReceiver () {
@@ -35,7 +54,6 @@ namespace Bee {
 		   	running_ = true;
 			AsyncReceive();
 	   	}
-
 	private:
 		void AsyncReceive ();
 		boost::asio::ip::udp::socket& socket_;
@@ -44,6 +62,7 @@ namespace Bee {
 		boost::asio::ip::udp::endpoint remote_endpoint_;
 		TypeCallback receive_callback_;
 	};
+
 
 	class UDPReceiver {
 
@@ -55,6 +74,7 @@ namespace Bee {
 		std::vector<std::unique_ptr<AsyncReceiver>> receivers_;
 		std::map<UDPEndPoint, boost::asio::ip::udp::endpoint> services_;
 		std::mutex mutex_servies_;
+		std::list<MulcastReceiver> multicast_services_;
 		boost::asio::deadline_timer timer_heart_;
 		size_t heartbeat_rate_ = 100; //ms
 		TypeCallback receive_callback_;
@@ -75,6 +95,7 @@ namespace Bee {
 		void AsyncHeartbeat();
 		void SendHeartbeat();
 	};
+
 
 }
 

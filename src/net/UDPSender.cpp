@@ -15,6 +15,9 @@ UDPSender::~UDPSender() { }
 void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf) {
 	std::lock_guard<std::mutex> lock(mutex_endpoints_);
 	for (auto i : endpoints_) {
+		if (i.second.is_multicast_) {
+			LOG_INFO << "sent to " << i.second.endpoint_.address().to_string();
+		}
 		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()), i.second.endpoint_,
 				[buf](const boost::system::error_code& error, std::size_t size) {
 					auto foo = buf;
@@ -50,9 +53,6 @@ void UDPSender::AddClient(UDPEndPoint endpoint) {
 		return ;
 	}
 	auto it = endpoints_.emplace(std::make_pair (endpoint, endpoint));
-	if (addr.is_multicast()) {
-		it.first->second.is_multicast_ = true;
-	}
 }
 
 void UDPSender::RemoveClient(UDPEndPoint endpoint) {
