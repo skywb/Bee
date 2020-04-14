@@ -15,7 +15,7 @@ namespace Bee {
 	public:
 		using TypeCallback = std::function<void(std::unique_ptr<Buffer>, UDPEndPoint)>;
 	public:
-		MulcastReceiver (boost::asio::io_service& service, const UDPEndPoint endpoint, TypeCallback callback);
+		MulcastReceiver (boost::asio::io_service& service, const UDPEndPoint& endpoint, TypeCallback callback);
 		virtual ~MulcastReceiver ();
 		void Run();
 		void Stop();
@@ -74,7 +74,8 @@ namespace Bee {
 		std::vector<std::unique_ptr<AsyncReceiver>> receivers_;
 		std::map<UDPEndPoint, boost::asio::ip::udp::endpoint> services_;
 		std::mutex mutex_servies_;
-		std::list<MulcastReceiver> multicast_services_;
+		std::list<std::unique_ptr<MulcastReceiver>> multicast_services_;
+		std::mutex mutex_multicast_services_;
 		boost::asio::deadline_timer timer_heart_;
 		size_t heartbeat_rate_ = 100; //ms
 		TypeCallback receive_callback_;

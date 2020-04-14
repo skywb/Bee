@@ -61,8 +61,10 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	log_stream.open("log.txt");
-#if LINUX
+#ifdef LINUX
 	system("pwd");
+#elif WIN
+	system("chdir");
 #endif
 
 	SetMyLibraryLogCallback(LogCallback);
@@ -78,6 +80,7 @@ int main(int argc, char *argv[]) {
 				char filename[1024];
 				buf += sizeof(file);
 				memcpy(filename, buf, file.file_name_len);
+				filename[file.file_name_len] = 0;
 				buf += file.file_name_len;
 				//auto fp = fopen(filename, "w+");
 				std::ofstream file_stream;
@@ -94,6 +97,7 @@ int main(int argc, char *argv[]) {
 				LOG_INFO << "receive a file : " << filename << " file len is " << file.file_data_len;
 			});
 #ifdef WIN
+		LOG_INFO << "current system is windows";
 		system("pause");
 #elif LINUX or UNIX
 		pause();
@@ -146,5 +150,6 @@ int main(int argc, char *argv[]) {
 		std::cout << "Format is : Demo [sender|receiver]" << std::endl;
 		return 1;
 	}
+	LOG_INFO << "exit";
 	return 0;
 }

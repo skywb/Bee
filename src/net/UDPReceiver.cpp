@@ -55,7 +55,7 @@ void UDPReceiver::AsyncReceive() {
 		receivers_[receivers_.size()-1]->Run();
 	}
 	for (auto& i : multicast_services_) {
-		i.Run();
+		i->Run();
 	}
 }
 
@@ -86,10 +86,14 @@ void UDPReceiver::SendBufferToService(std::unique_ptr<Buffer> buf, const bool al
 void UDPReceiver::AddService(UDPEndPoint endpoint) {
 	auto addr = boost::asio::ip::address::from_string(endpoint.IP);
 	if (addr.is_multicast()) {
-		multicast_services_.emplace_back(
-				socket_.get_io_service(), endpoint, receive_callback_);
-		auto it = multicast_services_.rbegin();
-		it->Run();
+		std::lock_guard<std::mutex> lock(mutex_multicast_services_);
+		auto mul_serveice = std::make_unique<MulcastReceiver> (socket_.get_io_service(), endpoint, receive_callback_);
+		mul_serveice->Run();
+		multicast_services_.push_back(std::move(mul_serveice));
+		//multicast_services_.emplace_back(
+		//		socket_.get_io_service(), endpoint, receive_callback_);
+		//auto it = multicast_services_.rbegin();
+		//it->Run();
 		LOG_INFO << "listen mulcast ip : " << endpoint.IP;
 	} else {
 		std::unique_lock<std::mutex> lock(mutex_servies_);
@@ -140,13 +144,13 @@ void AsyncReceiver::AsyncReceive() {
 }
 
 MulcastReceiver::MulcastReceiver (boost::asio::io_service& service,
-	   	const UDPEndPoint endpoint, TypeCallback callback) :
-#if LINUX
-	socket_(service, boost::asio::ip::udp::endpoint(
-				boost::asio::ip::address::from_string("0.0.0.0"), endpoint.port))
-#elif WIN
+	   	const UDPEndPoint& endpoint, TypeCallback callback) :
+#ifdef LINUX
 	socket_(service, boost::asio::ip::udp::endpoint(
 				boost::asio::ip::address::from_string(endpoint.IP), endpoint.port))
+#elif WIN
+	socket_(service, boost::asio::ip::udp::endpoint(
+				boost::asio::ip::address::from_string("0.0.0.0"), endpoint.port))
 #else
 	socket_(service, boost::asio::ip::udp::endpoint(
 				boost::asio::ip::address::from_string("0.0.0.0"), endpoint.port))
@@ -155,8 +159,13 @@ MulcastReceiver::MulcastReceiver (boost::asio::io_service& service,
 	multicast_port_(endpoint.port),
 	buf_(nullptr), receive_callback_(callback)
 {
+	LOG_INFO << "multicast is " << endpoint.IP;
+	boost::system::error_code error;
 	socket_.set_option(boost::asio::ip::multicast::join_group(
-				boost::asio::ip::address::from_string(multicast_ip_)));
+				boost::asio::ip::address::from_string(multicast_ip_)), error);
+	if (error) {
+		LOG_INFO << error.message();
+	}
 }
 
 MulcastReceiver::~MulcastReceiver () {
