@@ -19,12 +19,16 @@ namespace Bee {
 		virtual ~MulcastReceiver ();
 		void Run();
 		void Stop();
+		const std::string MulcastIP() { return multicast_ip_; }
+		const boost::asio::ip::udp::endpoint Endpoint() { return src_endpoint_; }
+		bool IsAvailbale() { return available_; }
 	private:
 		void AsyncReceive ();
 		boost::asio::ip::udp::socket socket_;
 		const std::string multicast_ip_;
 		const short multicast_port_;
 		boost::asio::ip::udp::endpoint src_endpoint_;
+		bool available_ = false;
 		uint8_t* buf_;
 		TypeCallback receive_callback_;
 	};

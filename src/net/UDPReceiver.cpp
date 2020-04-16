@@ -74,13 +74,14 @@ void UDPReceiver::SendBufferToService(std::unique_ptr<Buffer> buf, const bool al
 			   	[](const boost::system::error_code& error, std::size_t size){});
 	}
 	lock.unlock();
-//	std::unique_lock<std::mutex> lock_mulcast(mutex_multicast_servies_);
-//	for (auto i : multicast_services_) {
-//		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()),
-//			   	i.second,
-//			   	[](const boost::system::error_code& error, std::size_t size){});
-//	}
-//	lock_mulcast.unlock();
+	std::unique_lock<std::mutex> mul_lock(mutex_multicast_services_);
+	for (auto& i : multicast_services_) {
+		if (i->IsAvailbale()) {
+		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()),
+			   	i->Endpoint(),
+			   	[](const boost::system::error_code& error, std::size_t size){});
+		}
+	}
 }
 
 void UDPReceiver::AddService(UDPEndPoint endpoint) {
@@ -90,11 +91,6 @@ void UDPReceiver::AddService(UDPEndPoint endpoint) {
 		auto mul_serveice = std::make_unique<MulcastReceiver> (socket_.get_io_service(), endpoint, receive_callback_);
 		mul_serveice->Run();
 		multicast_services_.push_back(std::move(mul_serveice));
-		//multicast_services_.emplace_back(
-		//		socket_.get_io_service(), endpoint, receive_callback_);
-		//auto it = multicast_services_.rbegin();
-		//it->Run();
-		LOG_INFO << "listen mulcast ip : " << endpoint.IP;
 	} else {
 		std::unique_lock<std::mutex> lock(mutex_servies_);
 		auto it = services_.find(endpoint);
@@ -112,10 +108,12 @@ void UDPReceiver::AddService(UDPEndPoint endpoint) {
 void UDPReceiver::RemoveService(UDPEndPoint endpoint) {
 	auto addr = boost::asio::ip::address::from_string(endpoint.IP);
 	if (addr.is_multicast()) {
-		//TODO::
-		//socket_.set_option(boost::asio::ip::multicast::leave_group(addr));
-		//std::lock_guard<std::mutex> lock(mutex_multicast_servies_);
-		//multicast_services_.clear();
+		std::lock_guard<std::mutex> lock(mutex_multicast_services_);
+		for (auto it = multicast_services_.begin(); it != multicast_services_.end(); ++it) {
+			if ((*it)->MulcastIP() == endpoint.IP) {
+				multicast_services_.erase(it);
+			}
+		}
 	} else {
 		std::unique_lock<std::mutex> lock(mutex_servies_);
 		auto it = services_.find(endpoint);
@@ -189,6 +187,7 @@ void MulcastReceiver::AsyncReceive() {
 					AsyncReceive();
 					return ;
 				}
+				available_ = true;
 				UDPEndPoint endpoint;
 				endpoint.IP = src_endpoint_.address().to_string();
 				endpoint.port = src_endpoint_.port();

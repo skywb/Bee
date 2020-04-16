@@ -19,7 +19,7 @@ const short MULTYCAST_PORT = 8999;
 #ifdef WIN
 const std::string LOCAL_IP = "192.168.1.105";
 #elif LINUX or UNIX
-const std::string LOCAL_IP = "172.20.119.100";
+const std::string LOCAL_IP = "172.27.10.129";
 #endif
 const std::string UNICAST_IP = LOCAL_IP;
 const short UNICAST_PORT = 8888;
@@ -71,7 +71,15 @@ int main(int argc, char *argv[]) {
 	Bee::Connecter connecter;
 	if (memcmp(argv[1], "receiver", 6) == 0) {
 		connecter.SetLocalIPAndPort(LOCAL_IP, 6999);
-		connecter.AddService(MULTYCAST_IP, MULTYCAST_PORT);
+		if (argc < 4) {
+			std::cout << "Please input service IP and Port: ";
+			std::string IP;
+			short port;
+			std::cin >> IP >> port;
+			connecter.AddService(IP, port);
+		} else {
+			connecter.AddService(argv[2], atoi(argv[3]));
+		}
 		//connecter.AddService(UNICAST_IP, UNICAST_PORT);
 		connecter.SetPackageArrivedCallback([](std::unique_ptr<Bee::Package> package){
 				FileINFO file;
@@ -82,7 +90,6 @@ int main(int argc, char *argv[]) {
 				memcpy(filename, buf, file.file_name_len);
 				filename[file.file_name_len] = 0;
 				buf += file.file_name_len;
-				//auto fp = fopen(filename, "w+");
 				std::ofstream file_stream;
 				file_stream.open(filename, std::ios::binary | std::ios::out);
 				if (!file_stream) {
@@ -90,9 +97,6 @@ int main(int argc, char *argv[]) {
 				}
 				file_stream.seekp(0, std::ios::beg);
 				file_stream.write((char*)buf, file.file_data_len);
-				//fseek(fp, 0, SEEK_SET);
-				//auto re = fwrite(buf, 1, file.file_data_len, fp);
-				//fclose(fp);
 				file_stream.close();
 				LOG_INFO << "receive a file : " << filename << " file len is " << file.file_data_len;
 			});
@@ -103,6 +107,8 @@ int main(int argc, char *argv[]) {
 		pause();
 #endif
 	} else if (memcmp(argv[1], "sender", 6) == 0) {
+		LOG_INFO << "Multicast is " << MULTYCAST_IP << " : " << MULTYCAST_PORT;
+		LOG_INFO << "Unicast is " << UNICAST_IP << " : " << UNICAST_PORT;
 		//connecter.SetLocalIPAndPort(LOCAL_IP, UNICAST_PORT);
 		connecter.SetLocalIPAndPort("0.0.0.0", UNICAST_PORT);
 		connecter.AddClient(MULTYCAST_IP, MULTYCAST_PORT);
