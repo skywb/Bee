@@ -2,6 +2,7 @@
 #define CONNECTER_H
 
 #include "service/Service.h"
+#include "package/Package.h"
 
 namespace Bee {
 	class Connecter {
@@ -24,6 +25,9 @@ namespace Bee {
 		bool RequestToServeice(std::unique_ptr<Package> package);
 		bool RequestToServeice(std::unique_ptr<Package> package, const std::string IP, const short port);
 		void SetPackageArrivedCallback(Callback callback);
+		void SetPackageArrivedCallback(std::unique_ptr<PackageArrivedCallback> callback);
+		void SetPackageSendedCallback(Callback callback);
+		void SetPackageSendedCallback(std::unique_ptr<PackageSendedCallback> callback);
 
 		// get receiver current RTT
 		size_t GetRTT();

@@ -1,12 +1,11 @@
-//mlog.hpp
-#pragma once
- 
+#pragma once 
+
 #include <sstream>
 #include <iostream>
 #include <functional>
 #include <string>
 #include "mlog_def.hpp"
- 
+
 /*
 ** 用于在头文件内生成全局唯一对象
 */

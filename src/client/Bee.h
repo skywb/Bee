@@ -6,7 +6,10 @@
 #define BEE_LIBARY_API __declspec(dllimport)
 #endif
  
-#include "log/mlog_def.hpp"
+
+#include "log/mlog.hpp"
+#include "client/Connecter.h"
+
+ 
 //BEE_LIBARY_API void SetMyLibraryLogCallback(MLogCallBack logCallback);
 void SetMyLibraryLogCallback(MLogCallBack logCallback);
-

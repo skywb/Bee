@@ -1,5 +1,5 @@
 #include "Service.h"
-#include "service/mlog.h"
+#include "log/mlog.hpp"
 #include <mutex>
 
 #include <random>
@@ -21,6 +21,8 @@ void Service::SendPackageTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpo
 Service::Service() :
 	socket_(service_), 
 	using_process_thread_cnt_(0) {
+		arrived_callback_ = std::make_unique<PackageArrivedCallbackDefault> ();
+		sended_callback_ = std::make_unique<PackageSendedCallbackDefault> ();
 }
 
 Service::~Service() {

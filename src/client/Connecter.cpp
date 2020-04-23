@@ -48,8 +48,28 @@ bool Connecter::RequestToServeice(std::unique_ptr<Package> package,
 }
 
 void Connecter::SetPackageArrivedCallback(Callback callback) {
-	service_->SetPackageArrivedCallback(callback);
+	/*! TODO: Todo description here
+	*  \todo Todo description here
+	*/
+	//service_->SetPackageArrivedCallback(callback);
 }
+
+void Connecter::SetPackageArrivedCallback(std::unique_ptr<PackageArrivedCallback> callback) {
+	service_->SetPackageArrivedCallback(std::move(callback));
+}
+
+void Connecter::SetPackageSendedCallback(Callback callback) {
+	/*! TODO: Todo description here
+	*  \todo Todo description here
+	*/
+}
+
+void Connecter::SetPackageSendedCallback(std::unique_ptr<PackageSendedCallback> callback) {
+	/*! TODO: Todo description here
+	*  \todo Todo description here
+	*/
+}
+
 
 // set sender heater
 void Connecter::SetHeartRate(const std::size_t ms) {

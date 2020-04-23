@@ -5,10 +5,21 @@
 #include "net/UDPSender.h"
 #include "net/UDPReceiver.h"
 #include "PackageControl.h"
+#include "log/mlog.hpp"
 
 #include <queue>
 
 namespace Bee {
+	class PackageArrivedCallback {
+		public:
+			virtual void OnCallback(std::unique_ptr<Bee::Package> package) = 0;
+	};
+
+	class PackageSendedCallback {
+		public:
+			virtual void OnCallback(std::unique_ptr<Bee::Package> package) = 0;
+	};
+
 	class Service : public RecoverManager::Interface {
 	public:
 		//override RecoverManager::Interface
@@ -33,9 +44,10 @@ namespace Bee {
 		// unprocessed buffer
 		std::queue<std::unique_ptr<Buffer>> buffer_que_;
 		std::mutex mutex_buffer_que_;
-
 		int using_process_thread_cnt_ = 0;
 		std::mutex mutex_using_process_thread_cnt_;
+		std::unique_ptr<PackageArrivedCallback> arrived_callback_;
+		std::unique_ptr<PackageSendedCallback> sended_callback_;
 
 	public:
 		Service();
@@ -43,14 +55,19 @@ namespace Bee {
 		void Init();
 
 		void SetThreadCount(int thread_count);
-		void SetPackageArrivedCallback(PackageControl::PackageArrivedCallback callback) {
-			package_control_->SetPackageArrivedCallback(callback);
+		void SetPackageArrivedCallback(std::unique_ptr<PackageArrivedCallback> callback) {
+			arrived_callback_ = std::move(callback);
+			package_control_->SetPackageArrivedCallback([&](std::unique_ptr<Package> pack){
+					if (arrived_callback_)
+						arrived_callback_->OnCallback(std::move(pack));
+					else 
+						LOG_ERROR << "arrived_callback_ is null";
+				});
 		}
 
 		void SetLocalAddress(const std::string IP, const short port);
 		void Run();
 		void Stop();
-
 		void SendPackage(std::unique_ptr<Package> package);
 		void ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint);
 		size_t GetRTT();
@@ -63,9 +80,6 @@ namespace Bee {
 		bool Request(std::unique_ptr<Package> package, UDPEndPoint endpoint = UDPEndPoint{"0.0.0.0", 0});
 		void SetHeartbeatRate(const size_t rate) { sender_->SetHeartRate(rate); }
 		void SetTranspond(bool transpond);
-		//boost::asio::io_service& GetIOService() {
-		//	return service_;
-		//}
 
 	private:
 		void BufferNotFound();
@@ -79,6 +93,21 @@ namespace Bee {
 		std::unique_ptr<Buffer> GetBufferFromQue();
 		void AsyncProcessBuffers();
 	};
+
+	class PackageArrivedCallbackDefault : public PackageArrivedCallback {
+		public:
+			PackageArrivedCallbackDefault()  = default;
+			~PackageArrivedCallbackDefault()  = default;
+			virtual void OnCallback(std::unique_ptr<Bee::Package> package) {}
+	};
+
+	class PackageSendedCallbackDefault : public PackageSendedCallback {
+		public:
+			PackageSendedCallbackDefault()  = default;
+			~PackageSendedCallbackDefault()  = default;
+			virtual void OnCallback(std::unique_ptr<Bee::Package> package) {}
+	};
+
 }
 
 #endif
