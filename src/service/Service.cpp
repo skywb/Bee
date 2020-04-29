@@ -79,12 +79,21 @@ void Service::Stop() {
 	service_.stop();
 }
 
-void Service::SendPackage(std::unique_ptr<Package> package) {
-	auto buffers = std::move(package_control_->SplitPackage(std::move(package)));
-	for (int i=0; i<buffers.size(); ++i) {
-		std::shared_ptr<Buffer> buffer(buffers[i].release());
-		sender_->SendBuffer(buffer);
-		recover_manager_->AddPackRecord(buffer);
+void Service::SendPackage(std::unique_ptr<Package> package, std::function<void(void)> callback) {
+	std::shared_ptr<Package> pack(package.release());
+	service_.post(std::bind(&Service::DoSendPackage, this, pack, callback));
+}
+
+void Service::DoSendPackage(std::shared_ptr<Package> package, std::function<void(void)> callback) {
+	auto buffers = package_control_->SplitPackage(package);
+	for (int i = 0; i < buffers.size(); ++i) {
+		if (i == buffers.size() -1) {
+			AddBufferToSendQue(buffers[i], callback);
+		}
+		else {
+			AddBufferToSendQue(buffers[i]);
+		}
+		recover_manager_->AddPackRecord(buffers[i]);
 	}
 }
 
@@ -99,7 +108,7 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 			OnDataRecived(std::move(buffer));
 			break;
 		case BufferType::NACK:
-			LOG_INFO << "NACK";
+			LOG_INFO << "NACK " << buffer->GetBufferHeader().pack_num;
 			OnNACKRecived(std::move(buffer), endpoint);
 			break;
 		case BufferType::BUFFER_NOT_FOUND:
@@ -242,3 +251,24 @@ void Service::SetTranspond(bool transpond) {
 }
 
 
+void Service::AddBufferToSendQue(std::shared_ptr<Buffer> buf,
+		std::function<void(void)> callback) {
+	std::unique_lock<std::mutex> lock(mutex_send_que_);
+	send_que_.push(std::make_pair(buf, callback));
+	lock.unlock();
+	SendBufferFronQue();
+}
+
+void Service::SendBufferFronQue() {
+	std::unique_lock<std::mutex> lock(mutex_send_que_);
+	if ((send_que_.size() + 300 - 1) / 300 < send_thread_cnt_) return;
+	lock.unlock();
+	while (true) {
+		lock.lock();
+		if (send_que_.empty()) break;;
+		auto re = send_que_.front();
+		send_que_.pop();
+		lock.unlock();
+		sender_->SendBuffer(re.first, re.second);	
+	}
+}

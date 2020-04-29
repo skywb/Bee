@@ -21,12 +21,12 @@ RecoverManager::~RecoverManager() {
 }
 
 bool RecoverManager::PackageArrived(size_t package_num) {
-	//if (is_first_pack_num) {
-	//	is_first_pack_num = false;
-	//	min_pack_num_ = package_num;
-	//	max_pack_num_ = package_num;
-	//	return;
-	//}
+	if (is_first_pack_num) {
+		is_first_pack_num = false;
+		min_pack_num_ = package_num;
+		max_pack_num_ = package_num;
+		return true;
+	}
 
 	if (package_num < min_pack_num_ && min_pack_num_ + 10000 > min_pack_num_) {
 		return false;
@@ -64,7 +64,7 @@ void RecoverManager::AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer
 	if (package_history_.find(package_num) == package_history_.end()) {
 		auto result = package_history_.emplace(std::make_pair(package_num, pack_data));
 		if (!result.second) {
-			LOG_DEBUG << "emplace error " << package_num;
+			LOG_DEBUG << "emplace error, package number is " << package_num;
 		}
 	}
 }
@@ -72,6 +72,7 @@ void RecoverManager::AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer
 void RecoverManager::ClearOutTimeHistory() {
 	int cnt = package_history_.size() - history_max_len_ ;
 	if (cnt > 0)  {
+		std::lock_guard<std::mutex> lock(mutex_package_history_);
 		auto end = package_history_.begin();
 		std::advance(end, cnt);
 		package_history_.erase(package_history_.begin(), end);
@@ -89,7 +90,7 @@ std::shared_ptr<Buffer> RecoverManager::GetHistory(size_t pack_num) {
 
 void RecoverManager::NACKReceived(size_t pack_num, UDPEndPoint endpoint) {
 	auto pack = GetHistory(pack_num);
-	if (pack == nullptr) {
+	if (!pack) {
 		pack = Buffer::MakeBuffer();
 		pack->SetBufferType(BufferType::BUFFER_NOT_FOUND);
 	}

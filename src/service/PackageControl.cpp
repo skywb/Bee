@@ -1,5 +1,6 @@
 #include "PackageControl.h"
 #include "log/mlog.hpp"
+#include "boost/progress.hpp"
 
 using namespace Bee;
 
@@ -15,10 +16,8 @@ void PackageControl::OnReceivedBuffer(std::shared_ptr<Buffer> buffer) {
 		completing = EmpleaceCompleting(std::move(buffer));
 	}
 	if (completing->Check()) {
-		LOG_INFO << "complete";
 		auto package = std::move(completing->GetPackage());
 		if (package) {
-			LOG_INFO << "package complete";
 			OnPackageArrivedCallback_(std::move(package));
 		}
 	}
@@ -32,6 +31,12 @@ bool PackageCompleting::Check() {
 	return cur_count_ >= buf_count_;
 }
 
+size_t PackageControl::GetBufferNumber(const size_t cnt) {
+	std::lock_guard<std::mutex> lock(mutex_buffer_number_);
+	size_t beg_num = current_buffer_number_;
+	current_buffer_number_ += cnt;
+	return beg_num;
+}
 
 std::shared_ptr<PackageCompleting> 
 PackageControl::GetCompleting(const size_t beginNumber) {
@@ -122,17 +127,18 @@ std::unique_ptr<Package> PackageCompleting::OutTime() {
 	return std::move(package);
 }
 
-std::vector<std::unique_ptr<Buffer>> 
-PackageControl::SplitPackage(std::unique_ptr<Package> package) {
-	std::vector<std::unique_ptr<Buffer>> buffers;
+std::vector<std::shared_ptr<Buffer>> 
+PackageControl::SplitPackage(std::shared_ptr<Package> package) {
+	std::vector<std::shared_ptr<Buffer>> buffers;
 	auto buf = package->GetData();
 	size_t size = package->GetSize();
 	if (size <= 0) return std::move(buffers);
 	int buffer_cnt = size / Buffer::GetMaxSizeOfNotSplit();
 	if (buffer_cnt * Buffer::GetMaxSizeOfNotSplit() < size) ++buffer_cnt;
-	size_t begin_num = current_buffer_number_;
+	size_t begin_num = GetBufferNumber(buffer_cnt);
+	size_t pack_num = begin_num;
 	while (size > 0) {
-		auto buffer = std::make_unique<Buffer> ();
+		auto buffer = std::make_shared<Buffer> ();
 		if (size >= Buffer::GetMaxSizeOfNotSplit()) {
 			buffer->SetData(buf, Buffer::GetMaxSizeOfNotSplit());
 			buf += Buffer::GetMaxSizeOfNotSplit();
@@ -141,15 +147,31 @@ PackageControl::SplitPackage(std::unique_ptr<Package> package) {
 			buffer->SetData(buf, size);
 			size = 0;
 		}
-		buffer->SetPackNum(current_buffer_number_);
-		++current_buffer_number_;
+		buffer->SetPackNum(pack_num);
+		++pack_num;
 		buffer->SetBegin(begin_num);
 		buffer->SetCount(buffer_cnt);
 		buffer->SetBufferType(BufferType::DATA);
-		buffers.emplace_back(std::move(buffer));
+		buffers.push_back(buffer);
 	}
-	LOG_INFO << "sum of buffers " << buffers.size();
 	return std::move(buffers);
+	//std::vector<std::shared_ptr<Buffer>> buffers;
+	//if (package->GetSize() <= 0) return buffers;
+	//int buffer_cnt = package->GetBufferCount(); 
+	//size_t begin_num = GetBufferNumber(buffer_cnt);
+	//size_t pack_number = begin_num;
+	//for (int i = 0; i < buffer_cnt; ++i) {
+	//	//auto buffer = package->GetBuffer(i);	
+	//	auto buffer = std::make_shared<BufferFromPackage> (package);
+	//	auto re = package->GetBuffer(i);
+	//	buffer->SetData(re.first, re.second);
+	//	buffer->SetPackNum(begin_num+i);
+	//	buffer->SetBegin(begin_num);
+	//	buffer->SetCount(buffer_cnt);
+	//	buffer->SetBufferType(BufferType::DATA);
+	//	buffers.push_back(buffer);
+	//}
+	//return buffers;
 }
 
 PackageCompleting::PackageCompleting(std::shared_ptr<Buffer> buf) :

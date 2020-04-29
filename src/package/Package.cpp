@@ -5,7 +5,7 @@
 
 using namespace Bee;
 
-const uint8_t* Package::GetData() {
+uint8_t*const  Package::GetData() {
 	//return std::move(data_);
 	return data_.get();
 }
@@ -43,7 +43,7 @@ Buffer::~Buffer() {
 	if (data_) delete[] data_;
 }
 
-void Buffer::SetData(const uint8_t* data, size_t size) {
+void Buffer::SetData(uint8_t*const  data, size_t size) {
 	if (data_) delete  data_;
 	header_.size = size;
 	data_ = new uint8_t[header_.size+kBufferHeaderSize_];
@@ -71,3 +71,16 @@ size_t Buffer::GetDataSize() {
 	return header_.size;
 }
 
+
+//void BufferFromPackage::SetData(uint8_t *const  data, size_t size)  {
+//	uint8_t *const buf = package_->GetData();
+//	if (header_.pack_num - header_.begin > package_->GetBufferCount()) return;
+//	auto foo = package_->GetBuffer(header_.pack_num - header_.begin);
+//	data_ = foo.first;
+//	header_.size = foo.second;
+//}
+//
+//uint8_t* BufferFromPackage::GetBufferData()  {
+//	if (header_.pack_num == 0) return nullptr;
+//	return data_;
+//}

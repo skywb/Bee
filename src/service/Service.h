@@ -8,6 +8,7 @@
 #include "log/mlog.hpp"
 
 #include <queue>
+#include <utility>
 
 namespace Bee {
 	class PackageArrivedCallback {
@@ -48,6 +49,12 @@ namespace Bee {
 		std::mutex mutex_using_process_thread_cnt_;
 		std::unique_ptr<PackageArrivedCallback> arrived_callback_;
 		std::unique_ptr<PackageSendedCallback> sended_callback_;
+		//send buffer que
+		std::queue<std::pair<
+			std::shared_ptr<Buffer>,
+		   	std::function<void(void)>>> send_que_;
+		std::mutex mutex_send_que_;
+		int send_thread_cnt_ = 0;
 
 	public:
 		Service();
@@ -68,7 +75,7 @@ namespace Bee {
 		void SetLocalAddress(const std::string IP, const short port);
 		void Run();
 		void Stop();
-		void SendPackage(std::unique_ptr<Package> package);
+		void SendPackage(std::unique_ptr<Package> package, std::function<void(void)> callback = [](){});
 		void ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint);
 		size_t GetRTT();
 		void SetBufferOutTime(int ms); //ms
@@ -92,6 +99,10 @@ namespace Bee {
 		void AddBufferToQue(std::unique_ptr<Buffer> buf);
 		std::unique_ptr<Buffer> GetBufferFromQue();
 		void AsyncProcessBuffers();
+		void DoSendPackage(std::shared_ptr<Package> package, std::function<void(void)> callback);
+		void AddBufferToSendQue(std::shared_ptr<Buffer> buf,
+			   	std::function<void(void)> callback = [](){});
+		void SendBufferFronQue();
 	};
 
 	class PackageArrivedCallbackDefault : public PackageArrivedCallback {

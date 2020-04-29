@@ -12,28 +12,38 @@ UDPSender::UDPSender(boost::asio::ip::udp::socket& socket):
 
 UDPSender::~UDPSender() { }
 
-void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf) {
+void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf, std::function<void()> callback) {
 	std::lock_guard<std::mutex> lock(mutex_endpoints_);
+	bool is_send = false;
 	for (auto i : endpoints_) {
-		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()), i.second.endpoint_,
-				[buf](const boost::system::error_code& error, std::size_t size) {
+		is_send = true;
+		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), 
+				buf->GetBufferSize()), i.second.endpoint_,
+				[buf, callback](const boost::system::error_code& error, std::size_t size) {
 					auto foo = buf;
 					if (error) {
 						LOG_ERROR << "Send error : " << error.message();
 						return;
 					}
+					callback();
 				});
+	}
+	if (!is_send && callback) {
+		callback();
 	}
 }
 
-void UDPSender::SendBufferTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint) {
+void UDPSender::SendBufferTo(std::shared_ptr<Buffer> buf, 
+		const UDPEndPoint endpoint, std::function<void()> callback) {
 	boost::asio::ip::udp::endpoint ep(boost::asio::ip::address::from_string(endpoint.IP), endpoint.port);
 	socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), buf->GetBufferSize()), ep, 
 			[=](const boost::system::error_code& error, size_t size) {
 				auto tmp = buf;	
 				if (error) {
 					LOG_ERROR << "Send error : " << error.message();
+					LOG_ERROR << buf->GetBufferHeader().pack_num;
 				}
+				callback();
 			});
 }
 

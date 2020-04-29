@@ -21,7 +21,7 @@ namespace Bee {
 		void RemoveService(const std::string IP, const short port);
 		void AddClient(const std::string IP, const short port);
 		void RmoveClient(const std::string IP, const short port);
-		void SendPackage(std::unique_ptr<Package> package);
+		void SendPackage(std::unique_ptr<Package> package, std::function<void(void)> callback = [](){});
 		bool RequestToServeice(std::unique_ptr<Package> package);
 		bool RequestToServeice(std::unique_ptr<Package> package, const std::string IP, const short port);
 		void SetPackageArrivedCallback(Callback callback);
