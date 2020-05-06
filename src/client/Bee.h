@@ -7,9 +7,10 @@
 #endif
  
 
+#include "glog/logging.h"
 #include "log/mlog.hpp"
 #include "client/Connecter.h"
 
  
 //BEE_LIBARY_API void SetMyLibraryLogCallback(MLogCallBack logCallback);
-void SetMyLibraryLogCallback(MLogCallBack logCallback);
+//void SetMyLibraryLogCallback(MLogCallBack logCallback);

@@ -20,13 +20,11 @@ namespace Bee {
 			virtual void SendNack(const size_t package_num) = 0;
 			virtual void SendPackageTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint) = 0;
 		};
-
 	private:
 		std::map<size_t, std::shared_ptr<Buffer>> package_history_;
 		std::mutex mutex_package_history_;
 		std::map<size_t, std::chrono::time_point<std::chrono::system_clock>> recover_wait_;
 		std::mutex mutex_recover_wait_;
-
 		boost::asio::io_service& service_;
 		boost::asio::deadline_timer timer_NACK_tracer;
 		std::atomic<size_t> rtt_;
@@ -36,7 +34,6 @@ namespace Bee {
 		size_t oldest_nack_pack_num_ = 0;
 		bool is_first_pack_num = true;
 		int history_max_len_ = 10000;
-
 	public:
 		RecoverManager(boost::asio::io_service& service, Interface* sender);
 		virtual ~RecoverManager();

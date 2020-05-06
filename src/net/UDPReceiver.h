@@ -69,23 +69,21 @@ namespace Bee {
 
 
 	class UDPReceiver {
-
 	public:
 		using TypeCallback = std::function<void(std::unique_ptr<Buffer>, UDPEndPoint)>;
-
 	private:
 		boost::asio::ip::udp::socket& socket_;
 		std::vector<std::unique_ptr<AsyncReceiver>> receivers_;
+		std::mutex mutex_receivers_;
 		std::map<UDPEndPoint, boost::asio::ip::udp::endpoint> services_;
 		std::mutex mutex_servies_;
 		std::list<std::unique_ptr<MulcastReceiver>> multicast_services_;
 		std::mutex mutex_multicast_services_;
 		boost::asio::deadline_timer timer_heart_;
-		size_t heartbeat_rate_ = 100; //ms
+		size_t heartbeat_rate_ = 3000; //ms
 		TypeCallback receive_callback_;
 		uint8_t* buf_;
 		Buffer buf_heartbeat_;
-
 	public:
 		UDPReceiver(boost::asio::ip::udp::socket& socket, TypeCallback callback);
 		virtual ~UDPReceiver();
@@ -94,7 +92,7 @@ namespace Bee {
 		void SetHeartbeatRate(size_t rate /*ms*/) { heartbeat_rate_ = rate; }
 		void AddService(UDPEndPoint endpoint);
 		void RemoveService(UDPEndPoint endpoint);
-
+		void AddOneReceiver();
 	private:
 		bool IsServiceIP(const UDPEndPoint& ep);
 		void AsyncHeartbeat();

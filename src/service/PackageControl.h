@@ -43,12 +43,10 @@ namespace Bee {
 
 	private:
 		std::map<size_t, std::shared_ptr<PackageCompleting>> packages_;
-		//std::map<size_t, PackageSending> package_sending_;
 		std::mutex mutex_packages_;
 		PackageArrivedCallback OnPackageArrivedCallback_;
 		size_t current_buffer_number_ = 1;
 		std::mutex mutex_buffer_number_;
-		//size_t min_pack_num_can_received_ = 0;
 
 	public:
 		PackageControl() {
@@ -61,8 +59,8 @@ namespace Bee {
 			SplitPackage(std::shared_ptr<Package> package);
 		void SetPackageArrivedCallback(PackageArrivedCallback callback) 
 		{ OnPackageArrivedCallback_ = callback; }
-		size_t GetWaittingBufferNumber (const size_t max);
-		void ClearOutTimePackage(const size_t min);
+		//size_t GetWaittingBufferNumber (const size_t max);
+		//void ClearOutTimePackage(const size_t min);
 	private:
 		size_t GetBufferNumber(const size_t cnt);
 		std::shared_ptr<PackageCompleting> GetCompleting(const size_t beginNumber);

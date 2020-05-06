@@ -6,6 +6,7 @@
 #include "net/UDPReceiver.h"
 #include "PackageControl.h"
 #include "log/mlog.hpp"
+#include "Error.h"
 
 #include <queue>
 #include <utility>
@@ -51,10 +52,11 @@ namespace Bee {
 		std::unique_ptr<PackageSendedCallback> sended_callback_;
 		//send buffer que
 		std::queue<std::pair<
-			std::shared_ptr<Buffer>,
-		   	std::function<void(void)>>> send_que_;
+			std::shared_ptr<Buffer>, BeeCallback>> send_que_;
 		std::mutex mutex_send_que_;
 		int send_thread_cnt_ = 0;
+		std::queue<std::unique_ptr<Package>> arrived_package_;
+		std::mutex mutex_arrived_package_;
 
 	public:
 		Service();
@@ -65,17 +67,21 @@ namespace Bee {
 		void SetPackageArrivedCallback(std::unique_ptr<PackageArrivedCallback> callback) {
 			arrived_callback_ = std::move(callback);
 			package_control_->SetPackageArrivedCallback([&](std::unique_ptr<Package> pack){
-					if (arrived_callback_)
-						arrived_callback_->OnCallback(std::move(pack));
+					if (arrived_callback_) {
+						std::lock_guard<std::mutex> lock(mutex_arrived_package_);
+						arrived_package_.push(std::move(pack));
+						service_.post(std::bind(&Service::DoCallback, this));
+						//arrived_callback_->OnCallback(std::move(pack));
+					}
 					else 
 						LOG_ERROR << "arrived_callback_ is null";
 				});
 		}
-
+		size_t GetCurrentClientCount() { return sender_->GetClientCount(); }
 		void SetLocalAddress(const std::string IP, const short port);
 		void Run();
 		void Stop();
-		void SendPackage(std::unique_ptr<Package> package, std::function<void(void)> callback = [](){});
+		void SendPackage(std::unique_ptr<Package> package, BeeCallback callback);
 		void ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint);
 		size_t GetRTT();
 		void SetBufferOutTime(int ms); //ms
@@ -99,10 +105,11 @@ namespace Bee {
 		void AddBufferToQue(std::unique_ptr<Buffer> buf);
 		std::unique_ptr<Buffer> GetBufferFromQue();
 		void AsyncProcessBuffers();
-		void DoSendPackage(std::shared_ptr<Package> package, std::function<void(void)> callback);
+		void DoSendPackage(std::shared_ptr<Package> package, BeeCallback callback);
 		void AddBufferToSendQue(std::shared_ptr<Buffer> buf,
-			   	std::function<void(void)> callback = [](){});
+			   	BeeCallback callback = nullptr);
 		void SendBufferFronQue();
+		void DoCallback();
 	};
 
 	class PackageArrivedCallbackDefault : public PackageArrivedCallback {

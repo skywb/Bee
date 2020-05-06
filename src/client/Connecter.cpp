@@ -34,7 +34,7 @@ void Connecter::RmoveClient(const std::string IP, const short port) {
 	service_->RemoveClient(IP, port);
 }
 
-void Connecter::SendPackage(std::unique_ptr<Package> package, std::function<void(void)> callback) {
+void Connecter::SendPackage(std::unique_ptr<Package> package, BeeCallback callback) {
 	service_->SendPackage(std::move(package), callback);
 }
 

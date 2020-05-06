@@ -18,7 +18,10 @@ void PackageControl::OnReceivedBuffer(std::shared_ptr<Buffer> buffer) {
 	if (completing->Check()) {
 		auto package = std::move(completing->GetPackage());
 		if (package) {
-			OnPackageArrivedCallback_(std::move(package));
+			if (OnPackageArrivedCallback_)
+				OnPackageArrivedCallback_(std::move(package));
+			std::lock_guard<std::mutex> lock(mutex_packages_);
+			packages_.erase(begin_num);
 		}
 	}
 }
@@ -50,8 +53,8 @@ PackageControl::GetCompleting(const size_t beginNumber) {
 
 std::shared_ptr<PackageCompleting> 
 PackageControl::EmpleaceCompleting(std::shared_ptr<Buffer> buf) {
-	std::lock_guard<std::mutex> lock(mutex_packages_);
 	size_t begin_number = buf->GetBufferHeader().begin;
+	std::lock_guard<std::mutex> lock(mutex_packages_);
 	auto it = packages_.find(begin_number);
 	if (it == packages_.end()) {
 		packages_.emplace(begin_number, std::make_shared<PackageCompleting>());
@@ -69,7 +72,8 @@ void PackageControl::OnBufferNotFound(size_t pack_num) {
 		if (it->second->GetMaxPackageNumber() < pack_num) {
 			auto package = it->second->OutTime();
 			if (package) {
-				OnPackageArrivedCallback_(std::move(package));
+				if (OnPackageArrivedCallback_)
+					OnPackageArrivedCallback_(std::move(package));
 			}
 		}
 	}
@@ -155,23 +159,6 @@ PackageControl::SplitPackage(std::shared_ptr<Package> package) {
 		buffers.push_back(buffer);
 	}
 	return std::move(buffers);
-	//std::vector<std::shared_ptr<Buffer>> buffers;
-	//if (package->GetSize() <= 0) return buffers;
-	//int buffer_cnt = package->GetBufferCount(); 
-	//size_t begin_num = GetBufferNumber(buffer_cnt);
-	//size_t pack_number = begin_num;
-	//for (int i = 0; i < buffer_cnt; ++i) {
-	//	//auto buffer = package->GetBuffer(i);	
-	//	auto buffer = std::make_shared<BufferFromPackage> (package);
-	//	auto re = package->GetBuffer(i);
-	//	buffer->SetData(re.first, re.second);
-	//	buffer->SetPackNum(begin_num+i);
-	//	buffer->SetBegin(begin_num);
-	//	buffer->SetCount(buffer_cnt);
-	//	buffer->SetBufferType(BufferType::DATA);
-	//	buffers.push_back(buffer);
-	//}
-	//return buffers;
 }
 
 PackageCompleting::PackageCompleting(std::shared_ptr<Buffer> buf) :
@@ -221,28 +208,29 @@ bool PackageCompleting::AddBuffer(std::shared_ptr<Buffer> buf) {
 
 
 
-size_t PackageControl::GetWaittingBufferNumber(const size_t max) {
-	std::lock_guard<std::mutex> lock(mutex_packages_);
-	if (packages_.empty()) {
-		return max;
-	}
-	return  packages_.crbegin()->second->GetMaxPackageNumber();
-}
-
-void PackageControl::ClearOutTimePackage(const size_t min) {
-	std::vector<std::unique_ptr<Package>> outtime_packages;
-	std::unique_lock<std::mutex> lock(mutex_packages_);
-	for (auto it = packages_.begin(); it != packages_.end(); ) {
-		if (it->second->GetMaxPackageNumber() < min) {
-			auto package = std::move(it->second->OutTime());
-			outtime_packages.push_back(std::move(package));
-			it = packages_.erase(it);
-		} else {
-			++it;
-		}
-	}
-	lock.unlock();
-	for (auto& i : outtime_packages) {
-		OnPackageArrivedCallback_(std::move(i));
-	}
-}
+//size_t PackageControl::GetWaittingBufferNumber(const size_t max) {
+//	std::lock_guard<std::mutex> lock(mutex_packages_);
+//	if (packages_.empty()) {
+//		return max;
+//	}
+//	return  packages_.crbegin()->second->GetMaxPackageNumber();
+//}
+//
+//void PackageControl::ClearOutTimePackage(const size_t min) {
+//	std::vector<std::unique_ptr<Package>> outtime_packages;
+//	std::unique_lock<std::mutex> lock(mutex_packages_);
+//	for (auto it = packages_.begin(); it != packages_.end(); ) {
+//		if (it->second->GetMaxPackageNumber() < min) {
+//			auto package = std::move(it->second->OutTime());
+//			outtime_packages.push_back(std::move(package));
+//			it = packages_.erase(it);
+//		} else {
+//			++it;
+//		}
+//	}
+//	lock.unlock();
+//	for (auto& i : outtime_packages) {
+//			if (OnPackageArrivedCallback_)
+//				OnPackageArrivedCallback_(std::move(i));
+//	}
+//}

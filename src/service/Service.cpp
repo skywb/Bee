@@ -79,13 +79,13 @@ void Service::Stop() {
 	service_.stop();
 }
 
-void Service::SendPackage(std::unique_ptr<Package> package, std::function<void(void)> callback) {
+void Service::SendPackage(std::unique_ptr<Package> package, BeeCallback callback) {
 	std::shared_ptr<Package> pack(package.release());
 	service_.post(std::bind(&Service::DoSendPackage, this, pack, callback));
 }
 
-void Service::DoSendPackage(std::shared_ptr<Package> package, std::function<void(void)> callback) {
-	auto buffers = package_control_->SplitPackage(package);
+void Service::DoSendPackage(std::shared_ptr<Package> package, BeeCallback callback) {
+	auto buffers = std::move(package_control_->SplitPackage(package));
 	for (int i = 0; i < buffers.size(); ++i) {
 		if (i == buffers.size() -1) {
 			AddBufferToSendQue(buffers[i], callback);
@@ -108,7 +108,7 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 			OnDataRecived(std::move(buffer));
 			break;
 		case BufferType::NACK:
-			LOG_INFO << "NACK " << buffer->GetBufferHeader().pack_num;
+			//LOG_INFO << "NACK " << buffer->GetBufferHeader().pack_num;
 			OnNACKRecived(std::move(buffer), endpoint);
 			break;
 		case BufferType::BUFFER_NOT_FOUND:
@@ -116,7 +116,7 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 			OnNotFoundPackRecived(std::move(buffer));
 			break;
 		case BufferType::HEARTBEAT:
-			//OnNotFoundPackRecived(std::move(buffer));
+			LOG_INFO << "Recv HEARTBEAT";
 			OnHeartBeatReceived(std::move(buffer), endpoint);
 			break;
 		case BufferType::SYNC_HEATBEAT:
@@ -150,11 +150,12 @@ void Service::AddBufferToQue(std::unique_ptr<Buffer> buf) {
 
 void Service::AsyncProcessBuffers() {
 	std::unique_lock<std::mutex> lock(mutex_using_process_thread_cnt_);
-	if (using_process_thread_cnt_ != 0 && using_process_thread_cnt_ < threads_.size() - 2)  {
-		return;
-	} else {
-		using_process_thread_cnt_++;
-	}
+	if (using_process_thread_cnt_ >= 1) return;
+	//if (using_process_thread_cnt_ != 0 && using_process_thread_cnt_ < threads_.size() - 2)  {
+	//	return;
+	//} else {
+	//	using_process_thread_cnt_++;
+	//}
 	lock.unlock();
 	while (true) {
 		std::unique_ptr<Buffer> buf = std::move(GetBufferFromQue());
@@ -179,6 +180,7 @@ void Service::AsyncProcessBuffers() {
 std::unique_ptr<Buffer> Service::GetBufferFromQue() {
 	std::unique_lock<std::mutex> lock(mutex_buffer_que_);
 	if (buffer_que_.empty()) {
+		lock.unlock();
 		return nullptr;
 	}
 	auto p = std::move(buffer_que_.front());
@@ -252,23 +254,56 @@ void Service::SetTranspond(bool transpond) {
 
 
 void Service::AddBufferToSendQue(std::shared_ptr<Buffer> buf,
-		std::function<void(void)> callback) {
+		BeeCallback callback) {
 	std::unique_lock<std::mutex> lock(mutex_send_que_);
 	send_que_.push(std::make_pair(buf, callback));
 	lock.unlock();
-	SendBufferFronQue();
+	//std::unique_lock<std::mutex> l1(mutex_send_que_);
+	if (mutex_send_que_.try_lock()) {
+		//if ((send_que_.size() + 300 - 1) / 300 >= send_thread_cnt_) {
+		//	service_.post(std::bind(&Service::SendBufferFronQue, this));
+		//}
+			if (send_thread_cnt_ < 4) 
+				service_.post(std::bind(&Service::SendBufferFronQue, this));
+		mutex_send_que_.unlock();
+	}
 }
 
 void Service::SendBufferFronQue() {
 	std::unique_lock<std::mutex> lock(mutex_send_que_);
-	if ((send_que_.size() + 300 - 1) / 300 < send_thread_cnt_) return;
+	if (send_thread_cnt_ >= 2) return;
+	++send_thread_cnt_;
 	lock.unlock();
 	while (true) {
 		lock.lock();
-		if (send_que_.empty()) break;;
+		if (send_que_.empty()) {
+			lock.unlock();
+			break;
+		}
 		auto re = send_que_.front();
 		send_que_.pop();
 		lock.unlock();
-		sender_->SendBuffer(re.first, re.second);	
+		if (re.second)  {
+			auto callback = re.second;
+			sender_->SendBuffer(re.first, [callback, this](const Error error){
+						service_.post(std::bind(callback, error));
+					});	
+		} else {
+			sender_->SendBuffer(re.first);	
+		}
+	}
+	lock.lock();
+	--send_thread_cnt_;
+	lock.unlock();
+}
+
+void Service::DoCallback() {
+	while (true) {
+		std::unique_lock<std::mutex> lock(mutex_arrived_package_);
+		if (arrived_package_.empty()) break;
+		auto pack = std::move(arrived_package_.front());
+		arrived_package_.pop();
+		lock.unlock();
+		arrived_callback_->OnCallback(std::move(pack));
 	}
 }

@@ -47,16 +47,19 @@ void UDPReceiver::SendHeartbeat() {
 }
 
 void UDPReceiver::AsyncReceive() {
-	for (int i = 0; i < 10; ++i) {
-		receivers_.emplace_back(std::make_unique<AsyncReceiver>(socket_,
-				   	[&](std::unique_ptr<Buffer> buf, UDPEndPoint endpoint){
-			receive_callback_(std::move(buf), endpoint);
-		}));
-		receivers_[receivers_.size()-1]->Run();
-	}
+	AddOneReceiver();
+	LOG_DEBUG << "Add a Receiver";
 	for (auto& i : multicast_services_) {
 		i->Run();
 	}
+}
+void UDPReceiver::AddOneReceiver() {
+	std::lock_guard<std::mutex> lock(mutex_receivers_);
+	receivers_.emplace_back(std::make_unique<AsyncReceiver>(socket_,
+				[&](std::unique_ptr<Buffer> buf, UDPEndPoint endpoint){
+					receive_callback_(std::move(buf), endpoint);
+				}));
+	receivers_[receivers_.size()-1]->Run();
 }
 
 bool UDPReceiver::IsServiceIP(const UDPEndPoint& ep) {
@@ -88,7 +91,8 @@ void UDPReceiver::AddService(UDPEndPoint endpoint) {
 	auto addr = boost::asio::ip::address::from_string(endpoint.IP);
 	if (addr.is_multicast()) {
 		std::lock_guard<std::mutex> lock(mutex_multicast_services_);
-		auto mul_serveice = std::make_unique<MulcastReceiver> (socket_.get_io_service(), endpoint, receive_callback_);
+		auto mul_serveice = std::make_unique<MulcastReceiver> (
+				socket_.get_io_service(), endpoint, receive_callback_);
 		mul_serveice->Run();
 		multicast_services_.push_back(std::move(mul_serveice));
 	} else {
@@ -96,7 +100,8 @@ void UDPReceiver::AddService(UDPEndPoint endpoint) {
 		auto it = services_.find(endpoint);
 		if (it == services_.end()) {
 			services_.emplace(endpoint, boost::asio::ip::udp::endpoint(
-						boost::asio::ip::address::from_string(endpoint.IP), endpoint.port));
+						boost::asio::ip::address::from_string(endpoint.IP),
+					   	endpoint.port));
 			LOG_INFO << "Add a service : " << endpoint.IP << ":"
 			   	<< endpoint.port << " current service count is " << services_.size();
 		}
@@ -128,7 +133,9 @@ void AsyncReceiver::AsyncReceive() {
 	socket_.async_receive_from(boost::asio::buffer(buf_, 1500), remote_endpoint_, 
 			[&](const boost::system::error_code& error, std::size_t size) {
 				if (error) {
-					LOG_WARN << "receive error : " << error.message();
+					if (error.value() != 10061) {
+						LOG_WARN << "receive error " << error <<  ": " << error.message();
+					}
 					AsyncReceive();
 					return ;
 				}

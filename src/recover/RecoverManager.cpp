@@ -8,7 +8,7 @@ RecoverManager::RecoverManager(boost::asio::io_service& service, Interface* send
 	service_(service),
 	sender_(sender),
 	timer_NACK_tracer(service),
-	rtt_(400) {
+	rtt_(3000) {
 		size_t cur_rtt = rtt_;
 		min_pack_num_ = 0;
 		max_pack_num_ = 0;
@@ -27,28 +27,35 @@ bool RecoverManager::PackageArrived(size_t package_num) {
 		max_pack_num_ = package_num;
 		return true;
 	}
-
 	if (package_num < min_pack_num_ && min_pack_num_ + 10000 > min_pack_num_) {
 		return false;
 	}
-
-	std::lock_guard<std::mutex> lock(mutex_recover_wait_);
 	if (package_num > max_pack_num_) { //更大的包需要接收
+		std::unique_lock<std::mutex> lock(mutex_recover_wait_);
 		for (size_t i = max_pack_num_+1; i<package_num; ++i) {
 			recover_wait_.emplace(i, std::chrono::system_clock::now());
 		}
+		lock.unlock();
 		max_pack_num_ = package_num;
 	} else {
+		std::unique_lock<std::mutex> lock(mutex_recover_wait_);
 		auto it = recover_wait_.find(package_num);
+		lock.unlock();
 		if (it == recover_wait_.end()) {
 			return false;
 		} else {
+			//size_t new_rtt = 
+			//	std::chrono::duration_cast<std::chrono::milliseconds> (
+			//			std::chrono::system_clock::now() - it->second).count();
+			//rtt_ = rtt_ * 0.7 + new_rtt * 0.3;
+			lock.lock();
 			recover_wait_.erase(it);
 			if (recover_wait_.empty()) {
 				min_pack_num_ = max_pack_num_+1;
 			} else {
 				min_pack_num_ = recover_wait_.begin()->first;
 			}
+			lock.unlock();
 		}
 	}
 	return true;
@@ -59,10 +66,15 @@ void RecoverManager::AddPackRecord(std::shared_ptr<Buffer> buf) {
 	ClearOutTimeHistory();
 }
 
-void RecoverManager::AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer> pack_data) {
+void RecoverManager::AddPackToHistroy(size_t package_num,
+	   	std::shared_ptr<Buffer> pack_data) {
+	/*! TODO: 优化， CopyOnWrite
+	*  \todo 优化， CopyOnWrite
+	*/
 	std::lock_guard<std::mutex> lock(mutex_package_history_);
 	if (package_history_.find(package_num) == package_history_.end()) {
-		auto result = package_history_.emplace(std::make_pair(package_num, pack_data));
+		auto result = package_history_.emplace(
+				std::make_pair(package_num, pack_data));
 		if (!result.second) {
 			LOG_DEBUG << "emplace error, package number is " << package_num;
 		}
@@ -71,7 +83,7 @@ void RecoverManager::AddPackToHistroy(size_t package_num, std::shared_ptr<Buffer
 
 void RecoverManager::ClearOutTimeHistory() {
 	int cnt = package_history_.size() - history_max_len_ ;
-	if (cnt > 0)  {
+	if (cnt > (history_max_len_ >> 1))  {
 		std::lock_guard<std::mutex> lock(mutex_package_history_);
 		auto end = package_history_.begin();
 		std::advance(end, cnt);
@@ -93,6 +105,8 @@ void RecoverManager::NACKReceived(size_t pack_num, UDPEndPoint endpoint) {
 	if (!pack) {
 		pack = Buffer::MakeBuffer();
 		pack->SetBufferType(BufferType::BUFFER_NOT_FOUND);
+		pack->SetData(nullptr, 0);
+		pack->SetPackNum(pack_num);
 	}
 	sender_->SendPackageTo(pack, endpoint);
 }
@@ -101,6 +115,7 @@ void RecoverManager::NackTrackerHandler(const boost::system::error_code& error) 
 	size_t cur_rtt = rtt_;
 	auto now = std::chrono::system_clock::now();
 	std::vector<int> nacks;
+	LOG_DEBUG << "recover_wait_ size " << recover_wait_.size();
 	std::unique_lock<std::mutex> lock(mutex_recover_wait_);
 	auto it = recover_wait_.begin();
 	while (it != recover_wait_.end()) {
@@ -111,7 +126,6 @@ void RecoverManager::NackTrackerHandler(const boost::system::error_code& error) 
 			*/
 		} else if (it->second + std::chrono::milliseconds(cur_rtt) < now) {
 			nacks.push_back(it->first);
-			//sender_->SendNack(it->first);
 			++it;
 		} else {
 			++it;
@@ -123,7 +137,8 @@ void RecoverManager::NackTrackerHandler(const boost::system::error_code& error) 
 		sender_->SendNack(i);
 	}
 	timer_NACK_tracer.expires_from_now(boost::posix_time::milliseconds(cur_rtt));
-	timer_NACK_tracer.async_wait(std::bind(&RecoverManager::NackTrackerHandler, this, std::placeholders::_1));
+	timer_NACK_tracer.async_wait(
+			std::bind(&RecoverManager::NackTrackerHandler, this, std::placeholders::_1));
 }
 
 bool RecoverManager::WaitPackage(const size_t min_packnum, const size_t max_packnum) {
