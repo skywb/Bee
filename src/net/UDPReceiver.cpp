@@ -48,7 +48,6 @@ void UDPReceiver::SendHeartbeat() {
 
 void UDPReceiver::AsyncReceive() {
 	AddOneReceiver();
-	LOG_DEBUG << "Add a Receiver";
 	for (auto& i : multicast_services_) {
 		i->Run();
 	}
@@ -130,9 +129,11 @@ void UDPReceiver::RemoveService(UDPEndPoint endpoint) {
 }
 
 void AsyncReceiver::AsyncReceive() {
+	buf_ = new uint8_t[1500];
 	socket_.async_receive_from(boost::asio::buffer(buf_, 1500), remote_endpoint_, 
 			[&](const boost::system::error_code& error, std::size_t size) {
 				if (error) {
+					delete[] buf_;
 					if (error.value() != 10061) {
 						LOG_WARN << "receive error " << error <<  ": " << error.message();
 					}
@@ -142,8 +143,7 @@ void AsyncReceiver::AsyncReceive() {
 				UDPEndPoint endpoint;
 				endpoint.IP = remote_endpoint_.address().to_string();
 				endpoint.port = remote_endpoint_.port();
-				auto buf = std::make_unique<Buffer> (buf_, size);
-				receive_callback_(std::move(buf), endpoint);
+				receive_callback_(std::move(Buffer::BufferOnReceiver(buf_)), endpoint);
 				AsyncReceive();
 			});
 }

@@ -44,9 +44,19 @@ namespace Bee {
 		   	}
 			memcpy(data_, &header_, sizeof(header_));
 		}
+		void EmplaceBuffer(uint8_t* buf) {
+			if (data_) delete[] data_;
+			data_ = buf;
+			memcpy(&header_, data_, sizeof(header_));
+		}
 	public:
 		static size_t GetMaxSizeOfNotSplit() { return kMaxDataSizeOneBuffer_; }
 		static std::unique_ptr<Buffer> MakeBuffer() { return std::make_unique<Buffer> (); }
+		static std::unique_ptr<Buffer> BufferOnReceiver(uint8_t* buf) {
+			auto re = std::make_unique<Buffer> ();		
+			re->EmplaceBuffer(buf);
+			return std::move(re);
+	   	}
 		Buffer(const uint8_t* buf = nullptr, size_t size = kBufferHeaderSize_);
 		~Buffer();
 		virtual void SetData(uint8_t*const buf, size_t size);
@@ -69,7 +79,7 @@ namespace Bee {
 		enum Stat {
 			SUCCEE = 0,
 			COMPLETING	= 1,
-			COMPLETED	= 2,
+			//COMPLETED	= 2,
 			OUTTIME		= 3
 		};
 	private:
@@ -87,7 +97,7 @@ namespace Bee {
 		void SetData(const char* buf, size_t size);
 		size_t GetSize();
 		operator bool() {
-			return stat_ == COMPLETED;
+			return stat_ == SUCCEE;
 		}
 		Stat GetStat() { return stat_; }
 		void SetOutTime() { stat_ = OUTTIME; }

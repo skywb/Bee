@@ -14,6 +14,9 @@ void Service::SendNack(const size_t package_num) {
 	buf->SetData(nullptr, 0);
 	receiver_->SendBufferToService(std::move(buf));
 }
+void Service::OnBufferOutTime(const size_t package_num) {
+	package_control_->OnBufferNotFound(package_num);
+}
 
 void Service::SendPackageTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint) {
 	sender_->SendBufferTo(buf, endpoint);
@@ -62,11 +65,13 @@ void Service::SetLocalAddress(const std::string IP, const short port)  {
 	if (error) {
 		LOG_WARN << "socket open error : " << error.message();
 	}
-	//socket_.set_option(boost::asio::ip::udp::socket::send_buffer_size(1024*800));
+	//socket_.set_option(boost::asio::ip::udp::socket::send_buffer_size(1024*1000));
 	socket_.set_option(boost::asio::ip::udp::socket::receive_buffer_size(1024*2000));
 	socket_.bind(local_endpoint, error);
 	if (error) {
 		LOG_WARN << "bind error : " << error.message();
+		LOG_WARN << "IP is : " << IP << " port : " << port;
+		return;
 	}
 	LOG_INFO << "listen IP: " << IP << " Port: " << port;
 }
@@ -93,18 +98,13 @@ void Service::DoSendPackage(std::shared_ptr<Package> package, BeeCallback callba
 		else {
 			AddBufferToSendQue(buffers[i]);
 		}
-		recover_manager_->AddPackRecord(buffers[i]);
+		//recover_manager_->AddPackRecord(buffers[i]);
 	}
 }
 
 void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoint) {
-	//std::random_device rd;
-	//std::uniform_int_distribution<> dis(0,9);
 	switch (buffer->GetBufferHeader().type) {
 		case BufferType::DATA:
-			//if (dis(rd) < 2) {
-			//	break;
-			//}
 			OnDataRecived(std::move(buffer));
 			break;
 		case BufferType::NACK:
@@ -135,10 +135,10 @@ size_t Service::GetRTT() {
 }
 
 void Service::OnDataRecived(std::unique_ptr<Buffer> buf) {
-	bool is_effective_buffer = recover_manager_->PackageArrived(buf->GetBufferHeader().pack_num);
-	if (is_effective_buffer) {
+	//bool is_effective_buffer = recover_manager_->PackageArrived(buf->GetBufferHeader().pack_num);
+	//if (is_effective_buffer) {
 		AddBufferToQue(std::move(buf));
-	}
+	//}
 }
 
 void Service::AddBufferToQue(std::unique_ptr<Buffer> buf) {
@@ -156,19 +156,18 @@ void Service::AsyncProcessBuffers() {
 	//} else {
 	//	using_process_thread_cnt_++;
 	//}
+	++using_process_thread_cnt_;
 	lock.unlock();
 	while (true) {
 		std::unique_ptr<Buffer> buf = std::move(GetBufferFromQue());
 		if (!buf) { 
 			break;
 		}
+		bool is_ok = recover_manager_->PackageArrived(buf->GetBufferHeader().pack_num);
+		if (!is_ok) continue;
 		std::shared_ptr<Buffer> buf_shared = std::move(buf);
 		if (transpond_) {
 			sender_->SendBuffer(buf_shared);
-		}
-		if (buf_shared->GetBufferHeader().begin == buf_shared->GetBufferHeader().pack_num) {
-			recover_manager_->WaitPackage(buf_shared->GetBufferHeader().begin, 
-					buf_shared->GetBufferHeader().begin+buf_shared->GetBufferHeader().count-1);
 		}
 		package_control_->OnReceivedBuffer(buf_shared);
 	}
@@ -258,13 +257,9 @@ void Service::AddBufferToSendQue(std::shared_ptr<Buffer> buf,
 	std::unique_lock<std::mutex> lock(mutex_send_que_);
 	send_que_.push(std::make_pair(buf, callback));
 	lock.unlock();
-	//std::unique_lock<std::mutex> l1(mutex_send_que_);
 	if (mutex_send_que_.try_lock()) {
-		//if ((send_que_.size() + 300 - 1) / 300 >= send_thread_cnt_) {
-		//	service_.post(std::bind(&Service::SendBufferFronQue, this));
-		//}
-			if (send_thread_cnt_ < 4) 
-				service_.post(std::bind(&Service::SendBufferFronQue, this));
+		if (send_thread_cnt_ < 1) 
+			service_.post(std::bind(&Service::SendBufferFronQue, this));
 		mutex_send_que_.unlock();
 	}
 }

@@ -13,14 +13,14 @@ uint8_t*const  Package::GetData() {
 void Package::SetData(std::unique_ptr<uint8_t[]> data, size_t size) {
 	size_ = size;
 	data_ = std::move(data);
-	stat_ = COMPLETED;
+	stat_ = SUCCEE;
 }
 
 void Package::SetData(const char* buf, size_t size) {
 	data_ = std::make_unique<uint8_t[]> (size);
 	size_ =  size;
 	memcpy(data_.get(), buf, size);
-	stat_ = COMPLETED;
+	stat_ = SUCCEE;
 }
 
 size_t Package::GetSize() {

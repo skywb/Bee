@@ -8,7 +8,7 @@ RecoverManager::RecoverManager(boost::asio::io_service& service, Interface* send
 	service_(service),
 	sender_(sender),
 	timer_NACK_tracer(service),
-	rtt_(3000) {
+	rtt_(30) {
 		size_t cur_rtt = rtt_;
 		min_pack_num_ = 0;
 		max_pack_num_ = 0;
@@ -31,11 +31,14 @@ bool RecoverManager::PackageArrived(size_t package_num) {
 		return false;
 	}
 	if (package_num > max_pack_num_) { //更大的包需要接收
-		std::unique_lock<std::mutex> lock(mutex_recover_wait_);
-		for (size_t i = max_pack_num_+1; i<package_num; ++i) {
-			recover_wait_.emplace(i, std::chrono::system_clock::now());
+		if (package_num > max_pack_num_ + 1) {
+			auto now = std::chrono::system_clock::now();
+			std::unique_lock<std::mutex> lock(mutex_recover_wait_);
+			for (size_t i = max_pack_num_+2; i<package_num; ++i) {
+				recover_wait_.emplace(i, now);
+			}
+			lock.unlock();
 		}
-		lock.unlock();
 		max_pack_num_ = package_num;
 	} else {
 		std::unique_lock<std::mutex> lock(mutex_recover_wait_);
@@ -44,10 +47,10 @@ bool RecoverManager::PackageArrived(size_t package_num) {
 		if (it == recover_wait_.end()) {
 			return false;
 		} else {
-			//size_t new_rtt = 
-			//	std::chrono::duration_cast<std::chrono::milliseconds> (
-			//			std::chrono::system_clock::now() - it->second).count();
-			//rtt_ = rtt_ * 0.7 + new_rtt * 0.3;
+			size_t new_rtt = 
+				std::chrono::duration_cast<std::chrono::milliseconds> (
+						std::chrono::system_clock::now() - it->second).count();
+			rtt_ = rtt_ * 0.7 + new_rtt * 0.3 + 1;
 			lock.lock();
 			recover_wait_.erase(it);
 			if (recover_wait_.empty()) {
@@ -88,6 +91,7 @@ void RecoverManager::ClearOutTimeHistory() {
 		auto end = package_history_.begin();
 		std::advance(end, cnt);
 		package_history_.erase(package_history_.begin(), end);
+		LOG_INFO << "clear " << cnt << " packages";
 	}
 }
 
@@ -113,17 +117,16 @@ void RecoverManager::NACKReceived(size_t pack_num, UDPEndPoint endpoint) {
 
 void RecoverManager::NackTrackerHandler(const boost::system::error_code& error) {
 	size_t cur_rtt = rtt_;
+	LOG_EVERY_N(INFO, 100) << "current rtt is " << cur_rtt;
 	auto now = std::chrono::system_clock::now();
 	std::vector<int> nacks;
-	LOG_DEBUG << "recover_wait_ size " << recover_wait_.size();
+	//LOG_DEBUG << "recover_wait_ size " << recover_wait_.size();
 	std::unique_lock<std::mutex> lock(mutex_recover_wait_);
 	auto it = recover_wait_.begin();
 	while (it != recover_wait_.end()) {
 		if (it->second + std::chrono::milliseconds(cur_rtt*4) < now) {
+			sender_->OnBufferOutTime(it->first);
 			it = recover_wait_.erase(it);
-			/*! TODO: 处理超时的包
-			*  \todo 处理超时的包
-			*/
 		} else if (it->second + std::chrono::milliseconds(cur_rtt) < now) {
 			nacks.push_back(it->first);
 			++it;

@@ -27,6 +27,7 @@ namespace Bee {
 		//override RecoverManager::Interface
 		void SendNack(const size_t package_num) override;
 		void SendPackageTo(std::shared_ptr<Buffer> buf, const UDPEndPoint endpoint) override;
+		void OnBufferOutTime(const size_t package_num) override;
 
 		static Service& GetService() {
 			static Service instance;

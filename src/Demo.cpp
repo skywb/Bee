@@ -15,7 +15,7 @@
 
 
 
-const std::string MULTYCAST_IP = "224.0.0.1";
+const std::string MULTYCAST_IP = "224.0.0.122";
 const short MULTYCAST_PORT = 8999;
 #ifdef WIN
 const std::string LOCAL_IP = "192.168.1.105";
@@ -25,34 +25,7 @@ const std::string LOCAL_IP = "172.28.78.68";
 const std::string UNICAST_IP = LOCAL_IP;
 const short UNICAST_PORT = 8888;
 
-std::ofstream log_stream;
-
-//void LogCallback(const char *file, int line, const char *func, int severity, const char *content) {
-//	//if (severity < MLOG_INFO) return;
-//	static std::mutex mutex;
-//	std::lock_guard<std::mutex> lock(mutex);
-//	switch(severity) {
-//		case MLOG_DEBUG:
-//			std::cout << "[DEBUG] ";
-//			break;
-//		case MLOG_INFO:
-//			std::cout << "[INFO] ";
-//			break;
-//		case MLOG_WARN:
-//			std::cout << "[WARN] ";
-//			break;
-//		case MLOG_ERROR:
-//			std::cout << "[ERROR] ";
-//			break;
-//		case MLOG_FATAL:
-//			std::cout << "[FATAL] ";
-//			break;
-//	}
-//	std::cout << file << ":" << line << ":" << func << ":  " << content << std::endl;
-//}
-
 void Sender() {
-	//SetMyLibraryLogCallback(LogCallback);
 	Bee::Connecter connecter;
 	connecter.SetLocalIPAndPort("0.0.0.0", UNICAST_PORT);
 	LOG_INFO << "Unicast is " << UNICAST_IP << " : " << UNICAST_PORT;
@@ -99,7 +72,8 @@ void Sender() {
 void Receiver(const std::string IP, const short port) {
 	//SetMyLibraryLogCallback(LogCallback);
 	Bee::Connecter connecter;
-	connecter.SetLocalIPAndPort(LOCAL_IP, 6999);
+	const short local_port = port == 6999 ? 6998 : 6999;
+	connecter.SetLocalIPAndPort(LOCAL_IP, local_port);
 	connecter.AddService(IP, port);
 	//connecter.AddService(UNICAST_IP, UNICAST_PORT);
 	connecter.SetPackageArrivedCallback(std::make_unique<FileTransferTest>());
@@ -112,12 +86,11 @@ void Receiver(const std::string IP, const short port) {
 }
 
 void ReceiverSpeedTest(const std::string IP, const short port) {
-	//SetMyLibraryLogCallback(LogCallback);
 	Bee::Connecter connecter;
-	connecter.SetLocalIPAndPort(LOCAL_IP, 6999);
+	const short local_port = port == 6999 ? 6998 : 6999;
+	connecter.SetLocalIPAndPort(LOCAL_IP, local_port);
 	connecter.AddService(IP, port);
 	connecter.SetThreadCount(2);
-	//connecter.AddService(UNICAST_IP, UNICAST_PORT);
 	connecter.SetPackageArrivedCallback(std::make_unique<SpeedTest>());
 #ifdef WIN
 	LOG_INFO << "current system is windows";
@@ -141,32 +114,30 @@ void SendData(Bee::Connecter& connecter,
 		if (speed)
 			speed->AddSize(Bee::Package::GetMaxSizeOfNotSplit());
 	}
-		LOG_EVERY_N(INFO, 10000) << "100 package";
-	char buf[16000];
-	lock.lock();
-	int cur = cnt;
-	++cnt;
-	lock.unlock();
-	memcpy(buf, &cur, 4);
+	//std::this_thread::sleep_for(std::chrono::microseconds(5));
+	static char buf[16000];
+	//lock.lock();
+	//int cur = cnt;
+	//++cnt;
+	//lock.unlock();
+	//memcpy(buf, &cur, 4);
 	auto package = std::make_unique<Bee::Package> ();
 	package->SetData(buf, package->GetMaxSizeOfNotSplit()*10);
 	connecter.SendPackage(std::move(package),
-		   	std::bind(SendData, std::ref(connecter), speed, std::placeholders::_1, cur));
+		   	std::bind(SendData, std::ref(connecter), speed, std::placeholders::_1, 0));
 }
 
 void DataSender() {
-	//SetMyLibraryLogCallback(LogCallback);
-	//SpeedCalculate speed;
 	Bee::Connecter connecter;
 	connecter.SetThreadCount(2);
 	connecter.SetLocalIPAndPort(UNICAST_IP, UNICAST_PORT);
 	LOG_INFO << "Unicast is " << UNICAST_IP << " : " << UNICAST_PORT;
-	//connecter.AddClient(UNICAST_IP, 3888);
+	//std::cout << "Unicast is " << UNICAST_IP << " : " << UNICAST_PORT << std::endl;
+	//connecter.AddClient(MULTYCAST_IP, MULTYCAST_PORT);
+	connecter.AddClient("192.168.1.105", 9999);
 	//LOG_INFO << "Multicast is " << MULTYCAST_IP << " : " << MULTYCAST_PORT;
 	SendData(connecter, nullptr, Bee::Error::kSusseed, 0);
 	SendData(connecter, nullptr, Bee::Error::kSusseed, 0);
-	//SendData(connecter, nullptr, Bee::Error::kSusseed, 0);
-	//SendData(connecter, nullptr, Bee::Error::kSusseed, 0);
 #ifdef WIN
 	LOG_INFO << "current system is windows";
 	system("pause");
@@ -183,14 +154,13 @@ int main(int argc, const char *argv[]) {
 	google::InitGoogleLogging(argv[0]);
 	FLAGS_log_dir = "./";
 	FLAGS_alsologtostderr = false;
-	FLAGS_minloglevel = 3;
-	google::ShutdownGoogleLogging();
-	
-#ifdef LINUX
-	system("pwd");
-#elif WIN
-	system("chdir");
-#endif
+	//FLAGS_minloglevel = 3;
+	//google::ShutdownGoogleLogging();
+//#ifdef LINUX
+//	system("pwd");
+//#elif WIN
+//	system("chdir");
+//#endif
 	if (memcmp(argv[1], "receiver", 6) == 0) {
 		std::string IP;
 		short port;

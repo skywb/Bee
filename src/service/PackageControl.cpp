@@ -67,16 +67,23 @@ PackageControl::EmpleaceCompleting(std::shared_ptr<Buffer> buf) {
 
 void PackageControl::OnBufferNotFound(size_t pack_num) {
 	std::lock_guard<std::mutex> lock(mutex_packages_);
-	for (auto it = packages_.begin(); it != packages_.end(); ++it) {
-		if (it->first > pack_num) return;
-		if (it->second->GetMaxPackageNumber() < pack_num) {
-			auto package = it->second->OutTime();
-			if (package) {
-				if (OnPackageArrivedCallback_)
-					OnPackageArrivedCallback_(std::move(package));
-			}
-		}
+	auto it = packages_.upper_bound(pack_num);
+	if (it == packages_.end()) return;
+	--it;
+	if (it == packages_.end() || it->first < pack_num) return;
+	if (it->second) {
+		it->second->OutTime();
 	}
+	//for (auto it = packages_.begin(); it != packages_.end(); ++it) {
+	//	if (it->first > pack_num) return;
+	//	if (it->second->GetMaxPackageNumber() < pack_num) {
+	//		auto package = it->second->OutTime();
+	//		if (package) {
+	//			if (OnPackageArrivedCallback_)
+	//				OnPackageArrivedCallback_(std::move(package));
+	//		}
+	//	}
+	//}
 }
 
 std::unique_ptr<Package> 
@@ -107,26 +114,16 @@ PackageCompleting::GetPackage() {
 std::unique_ptr<Package> PackageCompleting::OutTime() {
 	std::lock_guard<std::mutex> lock(mutex_);
 	if (is_callbacked_) {
-		LOG_DEBUG << "current buffer count is " << cur_count_ << " sum is " << buf_count_;
 		return nullptr;
 	}
+	LOG_DEBUG << "Out Time: current buffer count is " << cur_count_ << " sum is " << buf_count_;
 	is_callbacked_ = true;
 	size_t size = 0;
-	for (auto& i : buffers_) {
-		size += i->GetDataSize();
-	}
 	auto package = std::make_unique<Package>();
-	auto data = std::make_unique<uint8_t[]> (size);
-	auto* buf = data.get();
-
 	for (auto& i : buffers_) {
-		if (i)
-			memcpy(buf, i->GetData(), i->GetDataSize());
-		buf += i->GetDataSize();
 		if (i)
 			i.reset();
 	}
-	package->SetData(std::move(data), size);
 	package->SetOutTime();
 	return std::move(package);
 }

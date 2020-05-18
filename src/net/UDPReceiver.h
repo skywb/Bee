@@ -40,21 +40,14 @@ namespace Bee {
 	public:
 		AsyncReceiver (boost::asio::ip::udp::socket& socket, TypeCallback callback) :
 			socket_(socket), 
-			receive_callback_(callback),
-			buf_(nullptr) {
+			receive_callback_(callback) {
 			running_ = false;
 		}
 		virtual ~AsyncReceiver () {
 			running_ = false;
-			if (buf_) {
-			   	delete [] buf_;
-				buf_ = nullptr;
-			}
 		}
 		void Stop () { running_ = false; }
 		void Run () { 
-			if (buf_) delete [] buf_;
-			buf_ = new uint8_t[1500];
 		   	running_ = true;
 			AsyncReceive();
 	   	}

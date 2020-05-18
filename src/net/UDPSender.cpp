@@ -17,6 +17,7 @@ UDPSender::~UDPSender() { }
 void UDPSender::SendBuffer(std::shared_ptr<Buffer> buf, BeeCallback callback) {
 	std::lock_guard<std::mutex> lock(mutex_endpoints_);
 	bool is_send = false;
+	LOG_EVERY_N(INFO, 100) << "endponts size " << endpoints_.size();
 	for (auto i : endpoints_) {
 		is_send = true;
 		socket_.async_send_to(boost::asio::buffer(buf->GetBufferData(), 
@@ -89,6 +90,7 @@ void UDPSender::ClearOutTimeClient() {
 			continue;
 		} 
 		if (i->second.time_ + std::chrono::milliseconds(heart_rate_*2) < cur_time) {
+			LOG_INFO << "remove client " << i->first.IP << " : " << i->first.port;
 			i = endpoints_.erase(i);
 		} else {
 			++i;
