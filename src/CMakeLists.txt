@@ -23,7 +23,8 @@ ENDIF (CMAKE_SYSTEM_NAME MATCHES "Linux")
 add_definitions("-std=c++14")
 #add_definitions("-g")
 
-set(CMAKE_BUILD_TYPE Release CACHE STRING "set build type to release")
+#set(CMAKE_BUILD_TYPE Release CACHE STRING "set build type to release")
+SET(CMAKE_BUILD_TYPE "Release")
 
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()

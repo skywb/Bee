@@ -66,7 +66,7 @@ void Service::SetLocalAddress(const std::string IP, const short port)  {
 		LOG_WARN << "socket open error : " << error.message();
 	}
 	//socket_.set_option(boost::asio::ip::udp::socket::send_buffer_size(1024*1000));
-	socket_.set_option(boost::asio::ip::udp::socket::receive_buffer_size(1024*2000));
+	socket_.set_option(boost::asio::ip::udp::socket::receive_buffer_size(1024*1024*300));
 	socket_.bind(local_endpoint, error);
 	if (error) {
 		LOG_WARN << "bind error : " << error.message();
@@ -93,12 +93,12 @@ void Service::DoSendPackage(std::shared_ptr<Package> package, BeeCallback callba
 	auto buffers = std::move(package_control_->SplitPackage(package));
 	for (int i = 0; i < buffers.size(); ++i) {
 		if (i == buffers.size() -1) {
-			AddBufferToSendQue(buffers[i], callback);
+			sender_->AsyncSendBuffer(buffers[i], callback);
 		}
 		else {
-			AddBufferToSendQue(buffers[i]);
+			sender_->AsyncSendBuffer(buffers[i]);
 		}
-		//recover_manager_->AddPackRecord(buffers[i]);
+		recover_manager_->AddPackRecord(buffers[i]);
 	}
 }
 
@@ -108,7 +108,7 @@ void Service::ReceivedHandler(std::unique_ptr<Buffer> buffer, UDPEndPoint endpoi
 			OnDataRecived(std::move(buffer));
 			break;
 		case BufferType::NACK:
-			//LOG_INFO << "NACK " << buffer->GetBufferHeader().pack_num;
+			LOG_INFO << "NACK " << buffer->GetBufferHeader().pack_num;
 			OnNACKRecived(std::move(buffer), endpoint);
 			break;
 		case BufferType::BUFFER_NOT_FOUND:
@@ -149,15 +149,17 @@ void Service::AddBufferToQue(std::unique_ptr<Buffer> buf) {
 }
 
 void Service::AsyncProcessBuffers() {
-	std::unique_lock<std::mutex> lock(mutex_using_process_thread_cnt_);
-	if (using_process_thread_cnt_ >= 1) return;
-	//if (using_process_thread_cnt_ != 0 && using_process_thread_cnt_ < threads_.size() - 2)  {
-	//	return;
-	//} else {
-	//	using_process_thread_cnt_++;
-	//}
-	++using_process_thread_cnt_;
-	lock.unlock();
+	if (mutex_using_process_thread_cnt_.try_lock()) {
+		if (using_process_thread_cnt_ >= 1) 
+		{
+			mutex_using_process_thread_cnt_.unlock();
+			return;
+		}
+		++using_process_thread_cnt_;
+		mutex_using_process_thread_cnt_.unlock();
+	} else {
+		return;
+	}
 	while (true) {
 		std::unique_ptr<Buffer> buf = std::move(GetBufferFromQue());
 		if (!buf) { 
@@ -167,13 +169,12 @@ void Service::AsyncProcessBuffers() {
 		if (!is_ok) continue;
 		std::shared_ptr<Buffer> buf_shared = std::move(buf);
 		if (transpond_) {
-			sender_->SendBuffer(buf_shared);
+			sender_->AsyncSendBuffer(buf_shared);
 		}
 		package_control_->OnReceivedBuffer(buf_shared);
 	}
-	lock.lock();	
+	std::lock_guard<std::mutex> lock(mutex_using_process_thread_cnt_);
 	using_process_thread_cnt_--;
-	lock.unlock();
 }
 
 std::unique_ptr<Buffer> Service::GetBufferFromQue() {
@@ -249,47 +250,6 @@ bool Service::Request(std::unique_ptr<Package> package, UDPEndPoint endpoint) {
 
 void Service::SetTranspond(bool transpond) {
 
-}
-
-
-void Service::AddBufferToSendQue(std::shared_ptr<Buffer> buf,
-		BeeCallback callback) {
-	std::unique_lock<std::mutex> lock(mutex_send_que_);
-	send_que_.push(std::make_pair(buf, callback));
-	lock.unlock();
-	if (mutex_send_que_.try_lock()) {
-		if (send_thread_cnt_ < 1) 
-			service_.post(std::bind(&Service::SendBufferFronQue, this));
-		mutex_send_que_.unlock();
-	}
-}
-
-void Service::SendBufferFronQue() {
-	std::unique_lock<std::mutex> lock(mutex_send_que_);
-	if (send_thread_cnt_ >= 2) return;
-	++send_thread_cnt_;
-	lock.unlock();
-	while (true) {
-		lock.lock();
-		if (send_que_.empty()) {
-			lock.unlock();
-			break;
-		}
-		auto re = send_que_.front();
-		send_que_.pop();
-		lock.unlock();
-		if (re.second)  {
-			auto callback = re.second;
-			sender_->SendBuffer(re.first, [callback, this](const Error error){
-						service_.post(std::bind(callback, error));
-					});	
-		} else {
-			sender_->SendBuffer(re.first);	
-		}
-	}
-	lock.lock();
-	--send_thread_cnt_;
-	lock.unlock();
 }
 
 void Service::DoCallback() {

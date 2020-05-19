@@ -44,6 +44,7 @@ void Sender() {
 		file_stream.seekg(0, std::ios::end);
 		auto size = file_stream.tellg();
 		LOG_INFO << "file length is : " << size << " Bytes";
+		std::cout << "file length is : " << size << " Bytes" << std::endl;
 		file_stream.seekg(0, std::ios::beg);
 		FileINFO file;
 		file.file_name_len = msg.size();
@@ -61,11 +62,13 @@ void Sender() {
 		}
 		auto package = std::make_unique<Bee::Package> ();
 		package->SetData(std::move(buf), buf_size);
-		//package->SetData(msg.c_str(), msg.size());
-		auto pp = new uint8_t[60];
-		connecter.SendPackage(std::move(package));
+		connecter.SendPackage(std::move(package), [](const Bee::Error error){
+					std::cout << "Send end" << std::endl;
+					std::cout << "please input file path: ";
+				});
 		file_stream.close();
 		LOG_INFO << "Send file len " << file.file_data_len;
+		std::cout << "Send file len " << file.file_data_len << std::endl;
 	}
 }
 
@@ -109,18 +112,11 @@ void SendData(Bee::Connecter& connecter,
 	if (error) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		LOG_INFO << "not found client";
-	}
-	else {
+	} else {
 		if (speed)
 			speed->AddSize(Bee::Package::GetMaxSizeOfNotSplit());
 	}
-	//std::this_thread::sleep_for(std::chrono::microseconds(5));
 	static char buf[16000];
-	//lock.lock();
-	//int cur = cnt;
-	//++cnt;
-	//lock.unlock();
-	//memcpy(buf, &cur, 4);
 	auto package = std::make_unique<Bee::Package> ();
 	package->SetData(buf, package->GetMaxSizeOfNotSplit()*10);
 	connecter.SendPackage(std::move(package),
@@ -134,7 +130,7 @@ void DataSender() {
 	LOG_INFO << "Unicast is " << UNICAST_IP << " : " << UNICAST_PORT;
 	//std::cout << "Unicast is " << UNICAST_IP << " : " << UNICAST_PORT << std::endl;
 	//connecter.AddClient(MULTYCAST_IP, MULTYCAST_PORT);
-	connecter.AddClient("192.168.1.105", 9999);
+	//connecter.AddClient("192.168.1.105", 9999);
 	//LOG_INFO << "Multicast is " << MULTYCAST_IP << " : " << MULTYCAST_PORT;
 	SendData(connecter, nullptr, Bee::Error::kSusseed, 0);
 	SendData(connecter, nullptr, Bee::Error::kSusseed, 0);
@@ -171,11 +167,11 @@ int main(int argc, const char *argv[]) {
 			IP = argv[2];
 			port = atoi(argv[3]);
 		}
-		//Receiver(IP, port);
-		ReceiverSpeedTest(IP, port);
+		Receiver(IP, port);
+		//ReceiverSpeedTest(IP, port);
 	} else if (memcmp(argv[1], "sender", 6) == 0) {
-		//Sender();
-		DataSender();
+		Sender();
+		//DataSender();
 	} else {
 		std::cout << "Format is : Demo [sender|receiver]" << std::endl;
 		return 1;

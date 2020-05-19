@@ -71,9 +71,6 @@ void RecoverManager::AddPackRecord(std::shared_ptr<Buffer> buf) {
 
 void RecoverManager::AddPackToHistroy(size_t package_num,
 	   	std::shared_ptr<Buffer> pack_data) {
-	/*! TODO: 优化， CopyOnWrite
-	*  \todo 优化， CopyOnWrite
-	*/
 	std::lock_guard<std::mutex> lock(mutex_package_history_);
 	if (package_history_.find(package_num) == package_history_.end()) {
 		auto result = package_history_.emplace(

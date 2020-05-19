@@ -40,6 +40,7 @@ void UDPReceiver::SendHeartbeat() {
 			   	[](const boost::system::error_code& error, std::size_t size){
 					if (error) {
 						LOG_ERROR << error.message();
+						return;
 					}
 					LOG_INFO << "Send heartbeat " ;
 				});
@@ -56,6 +57,7 @@ void UDPReceiver::AddOneReceiver() {
 	std::lock_guard<std::mutex> lock(mutex_receivers_);
 	receivers_.emplace_back(std::make_unique<AsyncReceiver>(socket_,
 				[&](std::unique_ptr<Buffer> buf, UDPEndPoint endpoint){
+					LOG_INFO << "receive " << buf->GetBufferHeader().pack_num;
 					receive_callback_(std::move(buf), endpoint);
 				}));
 	receivers_[receivers_.size()-1]->Run();

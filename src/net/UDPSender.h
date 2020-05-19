@@ -6,6 +6,7 @@
 #include "service/Error.h"
 
 #include <map>
+#include <queue>
 
 #include <boost/asio.hpp>
 
@@ -27,10 +28,19 @@ namespace Bee {
 			std::map<UDPEndPoint, TypeClient> endpoints_;
 			std::mutex mutex_endpoints_;
 			boost::asio::ip::udp::socket& socket_;
+			boost::asio::io_service& service_;
+			typedef std::queue<std::pair<
+				std::shared_ptr<Buffer>, BeeCallback>> Que_;
+			std::shared_ptr<Que_> sending_que_;
+			std::shared_ptr<Que_> wait_sending_que_;
+			std::mutex mutex_send_que_;
+			bool is_sending_ = false;
+
 		public:
 			UDPSender(boost::asio::ip::udp::socket& socket);
 			~UDPSender();
 			void SendBuffer(std::shared_ptr<Buffer> buf, BeeCallback callback = nullptr);
+			void AsyncSendBuffer(std::shared_ptr<Buffer> buf, BeeCallback callback = nullptr);
 			void SendBufferTo(std::shared_ptr<Buffer> buf, 
 					const UDPEndPoint endpoint, std::function<void()> callback = nullptr);
 			void SetHeartRate(unsigned int rate);
@@ -44,6 +54,7 @@ namespace Bee {
 			}
 		private:
 			void ClearOutTimeClient();
+			void SendBufferFromQue();
 	};
 }
 
